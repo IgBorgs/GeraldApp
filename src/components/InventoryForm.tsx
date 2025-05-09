@@ -147,7 +147,7 @@ const InventoryForm = ({ onSave = () => {} }) => {
   });
 
   return (
-    <Card className="w-full bg-white">
+    <Card className="w-full bg-background">
       <CardHeader>
         <CardTitle className="text-2xl">Current Inventory</CardTitle>
         <CardDescription>

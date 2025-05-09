@@ -8,7 +8,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChefHat, Clipboard, Settings, AlertCircle } from "lucide-react";
+import { ChefHat, Clipboard, AlertCircle } from "lucide-react";
+import Settings from "./Settings";
 import InventoryForm from "./InventoryForm";
 import PrepListDisplay from "./PrepListDisplay";
 import PARManagement from "./PARManagement";
@@ -49,10 +50,7 @@ const Dashboard = ({ userName = "Chef" }: DashboardProps) => {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <Settings className="h-4 w-4 mr-2" />
-            Settings
-          </Button>
+          <Settings />
           <Button size="sm">
             <ChefHat className="h-4 w-4 mr-2" />
             Start Prep

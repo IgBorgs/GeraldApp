@@ -188,7 +188,7 @@ const PARManagement = () => {
   };
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-sm w-full">
+    <div className="bg-background p-6 rounded-lg shadow-sm w-full">
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl font-bold">

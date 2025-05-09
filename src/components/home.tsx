@@ -13,7 +13,9 @@ import InventoryForm from "./InventoryForm";
 import PARManagement from "./PARManagement";
 import PrepListDisplay from "./PrepListDisplay";
 import { motion } from "framer-motion";
-import { ChefHat, Clipboard, List, Settings } from "lucide-react";
+import { ChefHat, Clipboard, Settings } from "lucide-react";
+import Tutorial from "./Tutorial";
+import QuickStartGuide from "./QuickStartGuide";
 
 const Home = () => {
   return (
@@ -42,10 +44,6 @@ const Home = () => {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <Settings className="h-4 w-4 mr-2" />
-            Settings
-          </Button>
           <Button size="sm">
             <Clipboard className="h-4 w-4 mr-2" />
             New Prep List
@@ -75,13 +73,8 @@ const Home = () => {
                 stay organized and efficient throughout your shift.
               </p>
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm">
-                  <List className="h-4 w-4 mr-2" />
-                  View Tutorial
-                </Button>
-                <Button variant="secondary" size="sm">
-                  Quick Start Guide
-                </Button>
+                <Tutorial />
+                <QuickStartGuide />
               </div>
             </div>
           </div>

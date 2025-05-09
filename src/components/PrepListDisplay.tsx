@@ -163,7 +163,7 @@ const PrepListDisplay = ({
   };
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-sm w-full">
+    <div className="bg-background p-6 rounded-lg shadow-sm w-full">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
         <div>
           <h2 className="text-2xl font-bold text-gray-800">Prep List</h2>
@@ -235,7 +235,7 @@ const PrepListDisplay = ({
                   {sortedItems.map((item) => (
                     <div
                       key={item.id}
-                      className={`flex items-center justify-between p-3 border rounded-md ${item.completed ? "bg-gray-50" : "bg-white"}`}
+                      className={`flex items-center justify-between p-3 border rounded-md ${item.completed ? "bg-muted" : "bg-card"}`}
                     >
                       <div className="flex items-center gap-3">
                         <Checkbox
