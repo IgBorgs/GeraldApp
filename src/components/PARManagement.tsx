@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabaseClient";
 import {
   Card,
   CardContent,
@@ -45,62 +46,16 @@ interface IngredientPAR {
   parLevel: number;
   unit: string;
   priority: "A" | "B" | "C";
-  notes: string;
+  notes: string;  
+  estimated_time: number;
+  menu_relevance: boolean;
 }
 
 const PARManagement = () => {
-  const [ingredients, setIngredients] = useState<IngredientPAR[]>([
-    {
-      id: "1",
-      name: "Chicken Breast",
-      category: "Protein",
-      parLevel: 20,
-      unit: "lbs",
-      priority: "A",
-      notes: "Main dinner protein",
-    },
-    {
-      id: "2",
-      name: "Romaine Lettuce",
-      category: "Produce",
-      parLevel: 15,
-      unit: "heads",
-      priority: "B",
-      notes: "For salads and wraps",
-    },
-    {
-      id: "3",
-      name: "Tomatoes",
-      category: "Produce",
-      parLevel: 25,
-      unit: "lbs",
-      priority: "B",
-      notes: "For salads and sandwiches",
-    },
-    {
-      id: "4",
-      name: "Flour",
-      category: "Dry Goods",
-      parLevel: 50,
-      unit: "lbs",
-      priority: "C",
-      notes: "For baking and sauces",
-    },
-    {
-      id: "5",
-      name: "Heavy Cream",
-      category: "Dairy",
-      parLevel: 8,
-      unit: "qts",
-      priority: "A",
-      notes: "For sauces and desserts",
-    },
-  ]);
-
+  const [ingredients, setIngredients] = useState<IngredientPAR[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
-  const [editingIngredient, setEditingIngredient] =
-    useState<IngredientPAR | null>(null);
+  const [editingIngredient, setEditingIngredient] = useState<IngredientPAR | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [newIngredient, setNewIngredient] = useState<Partial<IngredientPAR>>({
     name: "",
@@ -109,7 +64,33 @@ const PARManagement = () => {
     unit: "lbs",
     priority: "B",
     notes: "",
+    estimated_time: 15,
+    menu_relevance: false,
   });
+
+  useEffect(() => {
+    const fetchIngredients = async () => {
+      const { data, error } = await supabase.from("items").select("*");
+      if (error) {
+        console.error("❌ Failed to fetch ingredients:", error.message);
+        return;
+      }
+      const formatted = data.map((item) => ({
+        id: item.id,
+        name: item.name,
+        category: item.category,
+        parLevel: item.par_level,
+        unit: item.unit,
+        priority: item.priority,
+        notes: item.notes,
+        estimated_time: item.estimated_time,
+        menu_relevance: item.menu_relevance,
+      }));
+      setIngredients(formatted);
+    };
+    fetchIngredients();
+  }, []);
+   
 
   const categories = [
     "All",
@@ -118,6 +99,8 @@ const PARManagement = () => {
     "Dairy",
     "Dry Goods",
     "Spices",
+    "Sauces",
+    "Vegetables",
     "Other",
   ];
 
@@ -130,35 +113,99 @@ const PARManagement = () => {
     return matchesSearch && matchesCategory;
   });
 
-  const handleEditIngredient = (ingredient: IngredientPAR) => {
-    setEditingIngredient({ ...ingredient });
+  const handleEditIngredient = (ingredient) => {
+    setEditingIngredient({
+      id: ingredient.id,
+      name: ingredient.name || "",
+      category: ingredient.category || "",
+      parLevel: ingredient.parLevel || 0,
+      unit: ingredient.unit || "",
+      priority: ingredient.priority || "B",
+      notes: ingredient.notes || "",
+      estimated_time: ingredient.estimated_time || 0,
+      menu_relevance: ingredient.menu_relevance ?? false,
+    });
   };
+  
 
-  const handleSaveEdit = () => {
-    if (editingIngredient) {
-      setIngredients(
-        ingredients.map((ing) =>
-          ing.id === editingIngredient.id ? editingIngredient : ing,
-        ),
-      );
-      setEditingIngredient(null);
+  const handleSaveEdit = async () => {
+    if (!editingIngredient) return;
+  
+    const {
+      id,
+      name,
+      category,
+      parLevel,
+      unit,
+      priority,
+      notes,
+      estimated_time,
+      menu_relevance,
+    } = editingIngredient;
+  
+    const { error } = await supabase
+      .from("items")
+      .update({
+        name,
+        category,
+        par_level: parLevel, // assumes your Supabase column is named 'par_level'
+        unit,
+        priority,
+        notes,
+        estimated_time,
+        menu_relevance,
+      })
+      .eq("id", id);
+  
+    if (error) {
+      console.error("❌ Failed to update ingredient:", error.message);
+      alert("Failed to update the ingredient. Please try again.");
+      return;
     }
+  
+    // Optional: log or toast success message
+    console.log("✅ Ingredient updated successfully");
+  
+    // Update local state
+    setIngredients((prev) =>
+      prev.map((ing) => (ing.id === id ? { ...ing, ...editingIngredient } : ing))
+    );
+  
+    // Exit edit mode
+    setEditingIngredient(null);
   };
+  
+  
 
   const handleCancelEdit = () => {
     setEditingIngredient(null);
   };
 
-  const handleAddIngredient = () => {
-    const newId = (ingredients.length + 1).toString();
+  const handleAddIngredient = async () => {
     const ingredientToAdd = {
-      ...newIngredient,
-      id: newId,
-      priority: (newIngredient.priority || "B") as "A" | "B" | "C",
-      parLevel: Number(newIngredient.parLevel) || 0,
-    } as IngredientPAR;
-
-    setIngredients([...ingredients, ingredientToAdd]);
+      name: newIngredient.name || "",
+      category: newIngredient.category || "Protein",
+      par_level: newIngredient.parLevel || 0,
+      unit: newIngredient.unit || "",
+      priority: newIngredient.priority || "B",
+      notes: newIngredient.notes || "",
+      estimated_time: newIngredient.estimated_time || 15,
+      menu_relevance: newIngredient.menu_relevance || false,
+      created_at: new Date().toISOString(),
+    };
+    const { data, error } = await supabase.from("items").insert([ingredientToAdd]).select();
+    if (error) {
+      console.error("❌ Supabase insert failed:", error.message);
+      return;
+    }
+    setIngredients([
+      ...ingredients,
+      {
+        id: data[0].id,
+        ...ingredientToAdd,
+        parLevel: ingredientToAdd.par_level,
+      },
+    ]);
     setShowAddDialog(false);
     setNewIngredient({
       name: "",
@@ -167,12 +214,26 @@ const PARManagement = () => {
       unit: "lbs",
       priority: "B",
       notes: "",
+      estimated_time: 15,
+      menu_relevance: false,
     });
   };
+  
 
-  const handleDeleteIngredient = (id: string) => {
+  const handleDeleteIngredient = async (id: string) => {
+    const { error } = await supabase
+      .from("items")
+      .delete()
+      .eq("id", id);
+  
+    if (error) {
+      console.error("❌ Failed to delete ingredient:", error.message);
+      return;
+    }
+  
     setIngredients(ingredients.filter((ing) => ing.id !== id));
   };
+  
 
   const getPriorityColor = (priority: "A" | "B" | "C") => {
     switch (priority) {
@@ -191,9 +252,7 @@ const PARManagement = () => {
     <div className="bg-background p-6 rounded-lg shadow-sm w-full">
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl font-bold">
-            PAR Level Management
-          </CardTitle>
+          <CardTitle className="text-2xl font-bold">PAR Level Management</CardTitle>
           <CardDescription>
             Set and adjust target inventory levels for all ingredients
           </CardDescription>
@@ -211,10 +270,7 @@ const PARManagement = () => {
                 />
               </div>
               <div className="flex gap-2">
-                <Select
-                  value={categoryFilter}
-                  onValueChange={setCategoryFilter}
-                >
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                   <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="Category" />
                   </SelectTrigger>
@@ -226,10 +282,7 @@ const PARManagement = () => {
                     ))}
                   </SelectContent>
                 </Select>
-                <AlertDialog
-                  open={showAddDialog}
-                  onOpenChange={setShowAddDialog}
-                >
+                <AlertDialog open={showAddDialog} onOpenChange={setShowAddDialog}>
                   <AlertDialogTrigger asChild>
                     <Button className="flex items-center gap-1">
                       <Plus size={16} />
@@ -240,127 +293,107 @@ const PARManagement = () => {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Add New Ingredient</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Enter the details for the new ingredient and its PAR
-                        level.
+                        Enter the details for the new ingredient and its PAR level.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <div className="grid gap-4 py-4">
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <label className="text-right text-sm">Name</label>
-                        <Input
-                          className="col-span-3"
-                          value={newIngredient.name}
-                          onChange={(e) =>
-                            setNewIngredient({
-                              ...newIngredient,
-                              name: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <label className="text-right text-sm">Category</label>
-                        <Select
-                          value={newIngredient.category}
-                          onValueChange={(value) =>
-                            setNewIngredient({
-                              ...newIngredient,
-                              category: value,
-                            })
-                          }
+                      {['name', 'category', 'parLevel', 'unit', 'priority', 'notes'].map((field) => (
+                        <div
+                          key={field}
+                          className="grid grid-cols-4 items-center gap-4"
                         >
-                          <SelectTrigger className="col-span-3">
-                            <SelectValue placeholder="Select category" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {categories
-                              .filter((c) => c !== "All")
-                              .map((category) => (
-                                <SelectItem key={category} value={category}>
-                                  {category}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                          <label className="text-right text-sm capitalize">
+                            {field === 'parLevel' ? 'PAR Level' : field}
+                          </label>
+                          {field === 'category' || field === 'priority' ? (
+                            <Select
+                              value={newIngredient[field] || (field === 'category' ? 'Protein' : 'B')}
+                              onValueChange={(value) =>
+                                setNewIngredient({ ...newIngredient, [field]: value })
+                              }
+                            >
+                              <SelectTrigger className="col-span-3">
+                                <SelectValue placeholder={`Select ${field}`} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {(field === 'category'
+                                  ? categories.filter((c) => c !== 'All')
+                                  : ['A', 'B', 'C']
+                                ).map((opt) => (
+                                  <SelectItem value={opt} key={opt}>
+                                    {field === 'priority'
+                                      ? `${opt} - ${opt === 'A' ? 'High' : opt === 'B' ? 'Medium' : 'Low'}`
+                                      : opt}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Input
+                              className="col-span-3"
+                              type={field === 'parLevel' ? 'number' : 'text'}
+                              value={newIngredient[field]?.toString() || ''}
+                              onChange={(e) =>
+                                setNewIngredient({
+                                  ...newIngredient,
+                                  [field]: field === 'parLevel' ? parseInt(e.target.value) : e.target.value,
+                                })
+                              }
+                            />
+                          )}
+                        </div>
+                      ))}
                       <div className="grid grid-cols-4 items-center gap-4">
-                        <label className="text-right text-sm">PAR Level</label>
+                        <label className="text-right text-sm">Estimated Time (min)</label>
                         <Input
                           className="col-span-3"
                           type="number"
-                          value={newIngredient.parLevel?.toString() || "0"}
+                          value={newIngredient.estimated_time?.toString() || '0'}
                           onChange={(e) =>
                             setNewIngredient({
                               ...newIngredient,
-                              parLevel: parseInt(e.target.value),
+                              estimated_time: parseInt(e.target.value),
                             })
                           }
                         />
                       </div>
                       <div className="grid grid-cols-4 items-center gap-4">
-                        <label className="text-right text-sm">Unit</label>
-                        <Input
-                          className="col-span-3"
-                          value={newIngredient.unit}
-                          onChange={(e) =>
-                            setNewIngredient({
-                              ...newIngredient,
-                              unit: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <label className="text-right text-sm">Priority</label>
+                        <label className="text-right text-sm">Menu Relevant</label>
                         <Select
-                          value={newIngredient.priority}
-                          onValueChange={(value: "A" | "B" | "C") =>
+                          value={newIngredient.menu_relevance ? 'true' : 'false'}
+                          onValueChange={(value) =>
                             setNewIngredient({
                               ...newIngredient,
-                              priority: value,
+                              menu_relevance: value === 'true',
                             })
                           }
                         >
                           <SelectTrigger className="col-span-3">
-                            <SelectValue placeholder="Select priority" />
+                            <SelectValue placeholder="Select..." />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="A">A - High</SelectItem>
-                            <SelectItem value="B">B - Medium</SelectItem>
-                            <SelectItem value="C">C - Low</SelectItem>
+                            <SelectItem value="true">Yes</SelectItem>
+                            <SelectItem value="false">No</SelectItem>
                           </SelectContent>
                         </Select>
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <label className="text-right text-sm">Notes</label>
-                        <Input
-                          className="col-span-3"
-                          value={newIngredient.notes}
-                          onChange={(e) =>
-                            setNewIngredient({
-                              ...newIngredient,
-                              notes: e.target.value,
-                            })
-                          }
-                        />
                       </div>
                     </div>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleAddIngredient}>
-                        Add Ingredient
-                      </AlertDialogAction>
+                      <AlertDialogAction onClick={handleAddIngredient}>Add Ingredient</AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
               </div>
             </div>
-
+  
             <Tabs defaultValue="table" className="w-full">
-              <TabsList className="grid w-[200px] grid-cols-2">
-                <TabsTrigger value="table">Table</TabsTrigger>
-                <TabsTrigger value="cards">Cards</TabsTrigger>
-              </TabsList>
+    <TabsList className="grid w-[200px] grid-cols-2">
+      <TabsTrigger value="table">Table</TabsTrigger>
+      <TabsTrigger value="cards">Cards</TabsTrigger>
+    </TabsList>
+  
+              {/* Table View */}
               <TabsContent value="table" className="mt-4">
                 <div className="rounded-md border">
                   <Table>
@@ -372,6 +405,8 @@ const PARManagement = () => {
                         <TableHead>Unit</TableHead>
                         <TableHead>Priority</TableHead>
                         <TableHead>Notes</TableHead>
+                        <TableHead>Estimated Time</TableHead>
+                        <TableHead>Menu Relevant</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -408,16 +443,11 @@ const PARManagement = () => {
                                   <SelectValue placeholder="Select category" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {categories
-                                    .filter((c) => c !== "All")
-                                    .map((category) => (
-                                      <SelectItem
-                                        key={category}
-                                        value={category}
-                                      >
-                                        {category}
-                                      </SelectItem>
-                                    ))}
+                                  {categories.filter(c => c !== "All").map(category => (
+                                    <SelectItem key={category} value={category}>
+                                      {category}
+                                    </SelectItem>
+                                  ))}
                                 </SelectContent>
                               </Select>
                             ) : (
@@ -476,11 +506,7 @@ const PARManagement = () => {
                                 </SelectContent>
                               </Select>
                             ) : (
-                              <Badge
-                                className={getPriorityColor(
-                                  ingredient.priority,
-                                )}
-                              >
+                              <Badge className={getPriorityColor(ingredient.priority)}>
                                 {ingredient.priority}
                               </Badge>
                             )}
@@ -500,17 +526,52 @@ const PARManagement = () => {
                               ingredient.notes
                             )}
                           </TableCell>
+                          <TableCell>
+                            {editingIngredient?.id === ingredient.id ? (
+                              <Input
+                                type="number"
+                                value={editingIngredient.estimated_time.toString()}
+                                onChange={(e) =>
+                                  setEditingIngredient({
+                                    ...editingIngredient,
+                                    estimated_time: parseInt(e.target.value) || 0,
+                                  })
+                                }
+                              />
+                            ) : (
+                              `${ingredient.estimated_time} min`
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {editingIngredient?.id === ingredient.id ? (
+                              <Select
+                                value={editingIngredient.menu_relevance ? "true" : "false"}
+                                onValueChange={(value) =>
+                                  setEditingIngredient({
+                                    ...editingIngredient,
+                                    menu_relevance: value === "true",
+                                  })
+                                }
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="true">Yes</SelectItem>
+                                  <SelectItem value="false">No</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              ingredient.menu_relevance ? "Yes" : "No"
+                            )}
+                          </TableCell>
                           <TableCell className="text-right">
                             {editingIngredient?.id === ingredient.id ? (
                               <div className="flex justify-end gap-2">
                                 <Button size="sm" onClick={handleSaveEdit}>
                                   Save
                                 </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={handleCancelEdit}
-                                >
+                                <Button size="sm" variant="outline" onClick={handleCancelEdit}>
                                   Cancel
                                 </Button>
                               </div>
@@ -519,9 +580,7 @@ const PARManagement = () => {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() =>
-                                    handleEditIngredient(ingredient)
-                                  }
+                                  onClick={() => handleEditIngredient(ingredient)}
                                 >
                                   Edit
                                 </Button>
@@ -533,23 +592,14 @@ const PARManagement = () => {
                                   </AlertDialogTrigger>
                                   <AlertDialogContent>
                                     <AlertDialogHeader>
-                                      <AlertDialogTitle>
-                                        Are you sure?
-                                      </AlertDialogTitle>
+                                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        This will permanently delete{" "}
-                                        {ingredient.name} from your PAR levels.
+                                        This will permanently delete {ingredient.name}.
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
-                                      <AlertDialogCancel>
-                                        Cancel
-                                      </AlertDialogCancel>
-                                      <AlertDialogAction
-                                        onClick={() =>
-                                          handleDeleteIngredient(ingredient.id)
-                                        }
-                                      >
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleDeleteIngredient(ingredient.id)}>
                                         Delete
                                       </AlertDialogAction>
                                     </AlertDialogFooter>
@@ -564,6 +614,8 @@ const PARManagement = () => {
                   </Table>
                 </div>
               </TabsContent>
+  
+              {/* Cards View */}
               <TabsContent value="cards" className="mt-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filteredIngredients.map((ingredient) => (
@@ -571,9 +623,7 @@ const PARManagement = () => {
                       <CardHeader className="pb-2">
                         <div className="flex justify-between items-start">
                           <CardTitle>{ingredient.name}</CardTitle>
-                          <Badge
-                            className={getPriorityColor(ingredient.priority)}
-                          >
+                          <Badge className={getPriorityColor(ingredient.priority)}>
                             Priority {ingredient.priority}
                           </Badge>
                         </div>
@@ -582,19 +632,22 @@ const PARManagement = () => {
                       <CardContent>
                         <div className="space-y-2">
                           <div className="flex justify-between">
-                            <span className="text-sm font-medium">
-                              PAR Level:
-                            </span>
-                            <span>
-                              {ingredient.parLevel} {ingredient.unit}
-                            </span>
+                            <span className="text-sm font-medium">PAR Level:</span>
+                            <span>{ingredient.parLevel} {ingredient.unit}</span>
                           </div>
                           {ingredient.notes && (
                             <div className="text-sm text-gray-500">
-                              <span className="font-medium">Notes:</span>{" "}
-                              {ingredient.notes}
+                              <span className="font-medium">Notes:</span> {ingredient.notes}
                             </div>
                           )}
+                          <div className="flex justify-between text-sm">
+                            <span className="font-medium">Est. Time:</span>
+                            <span>{ingredient.estimated_time} min</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="font-medium">Menu Relevant:</span>
+                            <span>{ingredient.menu_relevance ? "Yes" : "No"}</span>
+                          </div>
                           <div className="flex justify-end gap-2 pt-2">
                             <Button
                               size="sm"
@@ -611,21 +664,14 @@ const PARManagement = () => {
                               </AlertDialogTrigger>
                               <AlertDialogContent>
                                 <AlertDialogHeader>
-                                  <AlertDialogTitle>
-                                    Are you sure?
-                                  </AlertDialogTitle>
+                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                   <AlertDialogDescription>
-                                    This will permanently delete{" "}
-                                    {ingredient.name} from your PAR levels.
+                                    This will permanently delete {ingredient.name}.
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() =>
-                                      handleDeleteIngredient(ingredient.id)
-                                    }
-                                  >
+                                  <AlertDialogAction onClick={() => handleDeleteIngredient(ingredient.id)}>
                                     Delete
                                   </AlertDialogAction>
                                 </AlertDialogFooter>
@@ -639,26 +685,12 @@ const PARManagement = () => {
                 </div>
               </TabsContent>
             </Tabs>
-
-            <div className="flex justify-end mt-4">
-              <Button className="flex items-center gap-2">
-                <Save size={16} />
-                Save All Changes
-              </Button>
-            </div>
-
-            <div className="flex items-center gap-2 p-4 bg-blue-50 rounded-md mt-4">
-              <AlertCircle className="h-5 w-5 text-blue-500" />
-              <p className="text-sm text-blue-700">
-                PAR levels determine what appears on prep lists. Priority A
-                items will be prepared first, followed by B and C.
-              </p>
-            </div>
           </div>
         </CardContent>
       </Card>
     </div>
   );
+  
 };
 
 export default PARManagement;

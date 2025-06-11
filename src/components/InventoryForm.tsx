@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -25,7 +25,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
+import { supabase } from "@/lib/supabaseClient";
+      
 interface InventoryItem {
   id: string;
   name: string;
@@ -38,72 +39,45 @@ interface InventoryItem {
 const InventoryForm = ({ onSave = () => {} }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [inventory, setInventory] = useState<InventoryItem[]>([
-    {
-      id: "1",
-      name: "Chicken Breast",
-      category: "Protein",
-      currentStock: 8,
-      parLevel: 20,
-      unit: "lbs",
-    },
-    {
-      id: "2",
-      name: "Romaine Lettuce",
-      category: "Produce",
-      currentStock: 5,
-      parLevel: 10,
-      unit: "heads",
-    },
-    {
-      id: "3",
-      name: "Tomatoes",
-      category: "Produce",
-      currentStock: 12,
-      parLevel: 15,
-      unit: "lbs",
-    },
-    {
-      id: "4",
-      name: "Heavy Cream",
-      category: "Dairy",
-      currentStock: 2,
-      parLevel: 6,
-      unit: "qts",
-    },
-    {
-      id: "5",
-      name: "Bacon",
-      category: "Protein",
-      currentStock: 4,
-      parLevel: 8,
-      unit: "lbs",
-    },
-    {
-      id: "6",
-      name: "Onions",
-      category: "Produce",
-      currentStock: 15,
-      parLevel: 20,
-      unit: "lbs",
-    },
-    {
-      id: "7",
-      name: "Flour",
-      category: "Dry Goods",
-      currentStock: 25,
-      parLevel: 50,
-      unit: "lbs",
-    },
-    {
-      id: "8",
-      name: "Eggs",
-      category: "Dairy",
-      currentStock: 24,
-      parLevel: 60,
-      unit: "ea",
-    },
-  ]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  useEffect(() => {
+    const fetchInventory = async () => {
+      const { data: itemsData, error: itemsError } = await supabase
+        .from("items")
+        .select("*");
+  
+      if (itemsError) {
+        console.error("❌ Error fetching items:", itemsError.message);
+        return;
+      }
+  
+      const { data: stockData, error: stockError } = await supabase
+        .from("stock")
+        .select("*");
+  
+      if (stockError) {
+        console.error("❌ Error fetching stock:", stockError.message);
+        return;
+      }
+  
+      const inventoryItems: InventoryItem[] = itemsData.map((item) => {
+        const stock = stockData.find((s) => s.item_id === item.id);
+        return {
+          id: item.id,
+          name: item.name,
+          category: item.category || "Uncategorized",
+          unit: item.unit || "",
+          parLevel: item.par_level || 0,
+          currentStock: stock?.quantity || 0,
+        };
+      });
+  
+      setInventory(inventoryItems);
+    };
+  
+    fetchInventory();
+  }, []);
+
 
   const categories = [
     "all",
@@ -119,10 +93,27 @@ const InventoryForm = ({ onSave = () => {} }) => {
     );
   };
 
-  const handleSave = () => {
-    // In a real implementation, this would save to a database
-    onSave(inventory);
+  const handleSave = async () => {
+    console.log("📦 Saving inventory to Supabase:", inventory);
+  
+    const formattedStock = inventory.map(item => ({
+      item_id: item.id,
+      quantity: item.currentStock,
+    }));
+  
+    const { data, error } = await supabase.from("stock").upsert(formattedStock, {
+      onConflict: ["item_id"],
+    });
+  
+    if (error) {
+      console.error("❌ Error saving stock to Supabase:", error.message);
+    } else {
+      console.log("✅ Stock saved successfully:", data);
+    }
   };
+  
+  
+  
 
   const getStatusBadge = (current: number, par: number) => {
     const ratio = current / par;
