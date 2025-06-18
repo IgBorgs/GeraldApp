@@ -71,20 +71,12 @@ const Dashboard = ({ userName = "Chef" }: DashboardProps) => {
   return (
     <div className="w-full h-full min-h-screen bg-background p-4 md:p-6 lg:p-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
-        <div className="flex items-center gap-4">
-          <div className="relative w-16 h-16 md:w-20 md:h-20">
-            <img
-              src="https://api.dicebear.com/7.x/avataaars/svg?seed=Gerald&accessories=mustache&clothesColor=gray&clothesType=overall&eyes=happy&eyebrows=default&facialHair=mediumBeard&facialHairColor=auburn&hairColor=auburn&mouth=smile&skinColor=light&top=hat"
-              alt="Gerald the Mouse Chef"
-              className="w-full h-full"
-            />
-          </div>
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold">Prep List Generator</h1>
-            <p className="text-muted-foreground">Welcome back, {userName}!</p>
-          </div>
-        </div>
+        <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
+        <div>
+      <h1 className="text-2xl md:text-3xl font-bold">Prep List Generator</h1>
+      <p className="text-muted-foreground">Welcome back, {userName}!</p>
+      </div>
+
         <div className="flex gap-2">
           <Settings />
           <Button size="sm">
