@@ -8,16 +8,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Search, Filter, ChevronDown } from "lucide-react";
+import { getAutoPriority, getPriorityColor } from "@/lib/priority";
 
 interface PrepItem {
   id: string;
   item_id: string;
   name: string;
-  quantity: number;
+  // quantity: number; // não vamos mais mostrar quantity
   unit: string;
   priority: "A" | "B" | "C";
   completed: boolean;
   estimatedTime: number;
+  recipeQty?: string | number;
 }
 
 const PrepListDisplay = () => {
@@ -28,62 +30,47 @@ const PrepListDisplay = () => {
 
   useEffect(() => {
     const fetchPrepList = async () => {
-      const today = new Date().toISOString().split("T")[0];
-      const { data, error } = await supabase
-        .from("prep_list")
-        .select("id, item_id, name, needed_quantity, unit, priority, completed")
-        .eq("date", today);
+      const { data: items, error: itemsError } = await supabase.from("items").select("*");
+      const { data: stock, error: stockError } = await supabase.from("stock").select("*");
 
-      if (error) {
-        console.error("❌ Failed to fetch prep list:", error.message);
+      if (itemsError || stockError) {
+        console.error("❌ Error fetching items/stock:", itemsError?.message || stockError?.message);
         return;
       }
-
-      if (data.length > 0) {
-        const formatted = data.map((item) => ({
-          id: item.id,
-          item_id: item.item_id,
-          name: item.name,
-          quantity: item.needed_quantity,
-          unit: item.unit,
-          priority: item.priority,
-          completed: item.completed,
-          estimatedTime: 15,
-        }));
-        setPrepItems(formatted);
-        return;
-      }
-
-      const { data: items } = await supabase.from("items").select("*, estimated_time, menu_relevance");
-      const { data: stock } = await supabase.from("stock").select("*");
 
       const generatedPrepItems = items
         .map((item) => {
           const stockItem = stock.find((s) => s.item_id === item.id);
           const currentStock = stockItem?.quantity ?? 0;
-          const neededQty = item.par_level - currentStock;
+          const neededQty = Math.max(0, item.par_level - currentStock);
 
-          let score = 0;
-          if (item.estimated_time > 30) score += 2;
-          if (currentStock < item.par_level * 0.2) score += 3;
-          if (item.menu_relevance) score += 2;
-
-          let dynamicPriority: "A" | "B" | "C" = "C";
-          if (score >= 7) dynamicPriority = "A";
-          else if (score >= 4) dynamicPriority = "B";
+          const priority = getAutoPriority({
+            currentQty: currentStock,
+            parLevel: item.par_level,
+            menu_relevance: item.menu_relevance,
+            estimated_time: item.estimated_time,
+            needsFryer: item.needs_fryer,
+            name: item.name,
+            isLunchItem: item.is_lunch_item,
+          });
 
           return {
             id: item.id,
             item_id: item.id,
             name: item.name,
-            quantity: neededQty > 0 ? neededQty : 0,
+            // quantity: neededQty,
             unit: item.unit,
-            priority: dynamicPriority,
+            priority,
             completed: false,
             estimatedTime: item.estimated_time || 15,
+            recipeQty: item.default_recipe_qty, // <-- só mostra recipes!
           };
         })
-        .filter((item) => item.quantity > 0);
+        .filter((item) => {
+          // Só mostra se tiver que produzir algo e tiver receita definida
+          // Se quiser mostrar todos os que precisa fazer, mesmo sem recipeQty, só filtre por neededQty > 0 (ajuste conforme preferir)
+          return item.recipeQty && item.recipeQty.toString().trim() !== "";
+        });
 
       setPrepItems(generatedPrepItems);
     };
@@ -92,64 +79,15 @@ const PrepListDisplay = () => {
   }, []);
 
   const generateDailyReport = () => {
-    const today = new Date().toISOString().split("T")[0];
     const todayItems = prepItems;
     const totalItems = todayItems.length;
     const completedItems = todayItems.filter(item => item.completed).length;
     const totalTime = todayItems.reduce((sum, item) => sum + item.estimatedTime, 0);
-    return { date: today, totalItems, completedItems, totalTime, items: todayItems };
-  };
-
-  const savePrepListToSupabase = async () => {
-    const today = new Date().toISOString().split("T")[0];
-    await supabase.from("prep_list").delete().eq("date", today);
-    const { data: items } = await supabase.from("items").select("*");
-    const { data: stock } = await supabase.from("stock").select("*");
-    const rowsToInsert = items
-      .map((item) => {
-        const stockItem = stock.find((s) => s.item_id === item.id);
-        const currentStock = stockItem?.quantity ?? 0;
-        const neededQty = item.par_level - currentStock;
-        return {
-          item_id: item.id,
-          name: item.name,
-          unit: item.unit,
-          priority: item.priority,
-          needed_quantity: neededQty > 0 ? neededQty : 0,
-          completed: false,
-          date: today,
-        };
-      })
-      .filter((item) => item.needed_quantity > 0);
-    if (rowsToInsert.length === 0) return;
-    const { data: inserted } = await supabase.from("prep_list").insert(rowsToInsert).select();
-    const formatted = inserted.map((item) => ({
-      id: item.id,
-      item_id: item.item_id,
-      name: item.name,
-      quantity: item.needed_quantity,
-      unit: item.unit,
-      priority: item.priority,
-      completed: item.completed,
-      estimatedTime: 15,
-    }));
-    setPrepItems(formatted);
+    return { totalItems, completedItems, totalTime, items: todayItems };
   };
 
   const handleMarkComplete = async (id: string, completed: boolean) => {
     setPrepItems((prev) => prev.map((item) => item.id === id ? { ...item, completed } : item));
-    await supabase.from("prep_list").update({ completed }).eq("id", id);
-    if (completed) {
-      const prepItem = prepItems.find((item) => item.id === id);
-      if (!prepItem) return;
-      const { data: existingStock } = await supabase
-        .from("stock")
-        .select("id, quantity")
-        .eq("item_id", prepItem.item_id)
-        .single();
-      const newQuantity = (existingStock?.quantity ?? 0) + prepItem.quantity;
-      await supabase.from("stock").update({ quantity: newQuantity }).eq("id", existingStock.id);
-    }
   };
 
   const filteredItems = prepItems.filter((item) => {
@@ -166,15 +104,6 @@ const PrepListDisplay = () => {
   });
 
   const report = generateDailyReport();
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "A": return "bg-red-100 text-red-800 border-red-200";
-      case "B": return "bg-yellow-100 text-yellow-800 border-yellow-200";
-      case "C": return "bg-green-100 text-green-800 border-green-200";
-      default: return "";
-    }
-  };
 
   return (
     <div className="bg-background p-6 rounded-lg shadow-sm w-full">
@@ -236,7 +165,6 @@ const PrepListDisplay = () => {
           <Card>
             <CardHeader className="pb-2 flex justify-between">
               <CardTitle className="text-lg">Prep Items</CardTitle>
-              <Button size="sm" onClick={savePrepListToSupabase}>Save Prep List to Supabase</Button>
             </CardHeader>
             <CardContent>
               {sortedItems.length > 0 ? (
@@ -253,8 +181,12 @@ const PrepListDisplay = () => {
                           <label htmlFor={`item-${item.id}`} className={`font-medium ${item.completed ? "line-through text-gray-500" : "text-gray-900"}`}>
                             {item.name}
                           </label>
-                          <div className="text-sm text-gray-500">
-                            {item.quantity} {item.unit} • {item.estimatedTime} min
+                          <div className="text-sm text-gray-500 flex items-center gap-2">
+                            {item.recipeQty
+                              ? <span className="font-bold text-primary">{item.recipeQty} {typeof item.recipeQty === "string" && item.recipeQty.toUpperCase().includes('R') ? '' : 'R'}</span>
+                              : <span className="text-gray-400 italic">Qtd. não definida</span>
+                            }
+                            <span>• {item.estimatedTime} min</span>
                           </div>
                         </div>
                       </div>
@@ -274,11 +206,3 @@ const PrepListDisplay = () => {
 };
 
 export default PrepListDisplay;
-
-
-
-
-
-
-
-

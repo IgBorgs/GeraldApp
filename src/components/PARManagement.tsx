@@ -17,7 +17,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,42 +38,10 @@ interface IngredientPAR {
   notes: string;
   estimated_time: number;
   menu_relevance: boolean;
-  currentQty: number;
+  default_recipe_qty?: string | number;
   isLunchItem: boolean;
   needsFryer: boolean;
 }
-
-const getAutoPriority = ({
-  currentQty,
-  parLevel,
-  menu_relevance,
-  estimated_time,
-  needsFryer,
-  name,
-  isLunchItem,
-}: Omit<IngredientPAR, "id" | "category" | "unit" | "notes">): "A" | "B" | "C" => {
-  const percent = (currentQty / parLevel) * 100;
-  if (name.toLowerCase().includes("prime rib seasoning")) return "A";
-  if (percent <= 30) return "A";
-  if (needsFryer) return "A";
-  if (estimated_time >= 90) return "A";
-  if (isLunchItem) return "A";
-  if (menu_relevance && percent <= 75) return "B";
-  return "C";
-};
-
-const getPriorityColor = (priority: "A" | "B" | "C") => {
-  switch (priority) {
-    case "A":
-      return "bg-red-100 text-red-800 hover:bg-red-200";
-    case "B":
-      return "bg-yellow-100 text-yellow-800 hover:bg-yellow-200";
-    case "C":
-      return "bg-green-100 text-green-800 hover:bg-green-200";
-    default:
-      return "";
-  }
-};
 
 const PARManagement = () => {
   const [ingredients, setIngredients] = useState<IngredientPAR[]>([]);
@@ -91,6 +58,7 @@ const PARManagement = () => {
     notes: "",
     estimated_time: 15,
     menu_relevance: false,
+    default_recipe_qty: "",
     isLunchItem: false,
     needsFryer: false,
   });
@@ -99,34 +67,28 @@ const PARManagement = () => {
     const { data: items, error: itemsError } = await supabase
       .from("items")
       .select("*");
-    const { data: stock, error: stockError } = await supabase
-      .from("stock")
-      .select("*");
 
-    if (itemsError || stockError) {
+    if (itemsError) {
       console.error(
-        "❌ Failed to fetch ingredients or stock:",
-        itemsError?.message || stockError?.message
+        "❌ Failed to fetch ingredients:",
+        itemsError?.message
       );
       return;
     }
 
-    const formatted = items.map((item) => {
-      const stockEntry = stock.find((s) => s.item_id === item.id);
-      return {
-        id: item.id,
-        name: item.name,
-        category: item.category,
-        parLevel: item.par_level,
-        unit: item.unit,
-        notes: item.notes,
-        estimated_time: item.estimated_time,
-        menu_relevance: item.menu_relevance,
-        currentQty: stockEntry?.quantity ?? 0,
-        isLunchItem: item.is_lunch_item ?? false,
-        needsFryer: item.needs_fryer ?? false,
-      };
-    });
+    const formatted = items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      category: item.category,
+      parLevel: item.par_level,
+      unit: item.unit,
+      notes: item.notes,
+      estimated_time: item.estimated_time,
+      menu_relevance: item.menu_relevance,
+      default_recipe_qty: item.default_recipe_qty,
+      isLunchItem: item.is_lunch_item ?? false,
+      needsFryer: item.needs_fryer ?? false,
+    }));
 
     setIngredients(formatted);
   };
@@ -145,6 +107,7 @@ const PARManagement = () => {
         notes: newIngredient.notes,
         estimated_time: newIngredient.estimated_time,
         menu_relevance: newIngredient.menu_relevance,
+        default_recipe_qty: newIngredient.default_recipe_qty,
         is_lunch_item: newIngredient.isLunchItem,
         needs_fryer: newIngredient.needsFryer,
       },
@@ -160,6 +123,7 @@ const PARManagement = () => {
         notes: "",
         estimated_time: 15,
         menu_relevance: false,
+        default_recipe_qty: "",
         isLunchItem: false,
         needsFryer: false,
       });
@@ -186,6 +150,7 @@ const PARManagement = () => {
         notes: editedIngredient.notes,
         estimated_time: editedIngredient.estimated_time,
         menu_relevance: editedIngredient.menu_relevance,
+        default_recipe_qty: editedIngredient.default_recipe_qty,
         is_lunch_item: editedIngredient.isLunchItem,
         needs_fryer: editedIngredient.needsFryer,
       })
@@ -240,11 +205,12 @@ const PARManagement = () => {
                     { label: "Notes", field: "notes", type: "text" },
                     { label: "Estimated Time", field: "estimated_time", type: "number" },
                     { label: "Menu Relevance", field: "menu_relevance", type: "checkbox" },
+                    { label: "Qty to Prep (Recipe)", field: "default_recipe_qty", type: "text" },
                     { label: "Lunch Item", field: "isLunchItem", type: "checkbox" },
                     { label: "Needs Fryer", field: "needsFryer", type: "checkbox" },
                   ].map(({ label, field, type }) => (
                     <div key={field} className="col-span-4 sm:col-span-2 flex items-center gap-2">
-                      <label className="text-sm font-medium w-32">{label}</label>
+                      <label className="text-sm font-medium w-40">{label}</label>
                       {type === "checkbox" ? (
                         <Input
                           type="checkbox"
@@ -292,39 +258,30 @@ const PARManagement = () => {
                   <TableHead>Name</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>PAR</TableHead>
-                  <TableHead>Current Qty</TableHead>
                   <TableHead>Unit</TableHead>
-                  <TableHead>Priority</TableHead>
+                  <TableHead>Qty to Prep</TableHead>
                   <TableHead>Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredIngredients.map((ing) => {
-                  const priority = getAutoPriority(ing);
-                  return (
-                    <TableRow key={ing.id}>
-                      <TableCell>{ing.name}</TableCell>
-                      <TableCell>{ing.category}</TableCell>
-                      <TableCell>{ing.parLevel}</TableCell>
-                      <TableCell>{ing.currentQty}</TableCell>
-                      <TableCell>{ing.unit}</TableCell>
-                      <TableCell>
-                        <Badge className={getPriorityColor(priority)}>
-                          {priority}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          onClick={() => openEditDialog(ing)}
-                        >
-                          <Pencil size={16} />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {filteredIngredients.map((ing) => (
+                  <TableRow key={ing.id}>
+                    <TableCell>{ing.name}</TableCell>
+                    <TableCell>{ing.category}</TableCell>
+                    <TableCell>{ing.parLevel}</TableCell>
+                    <TableCell>{ing.unit}</TableCell>
+                    <TableCell>{ing.default_recipe_qty}</TableCell>
+                    <TableCell>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={() => openEditDialog(ing)}
+                      >
+                        <Pencil size={16} />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </div>
@@ -343,11 +300,12 @@ const PARManagement = () => {
                   { label: "Notes", field: "notes", type: "text" },
                   { label: "Estimated Time", field: "estimated_time", type: "number" },
                   { label: "Menu Relevance", field: "menu_relevance", type: "checkbox" },
+                  { label: "Qty to Prep (Recipe)", field: "default_recipe_qty", type: "text" },
                   { label: "Lunch Item", field: "isLunchItem", type: "checkbox" },
                   { label: "Needs Fryer", field: "needsFryer", type: "checkbox" },
                 ].map(({ label, field, type }) => (
                   <div key={field} className="col-span-4 sm:col-span-2 flex items-center gap-2">
-                    <label className="text-sm font-medium w-32">{label}</label>
+                    <label className="text-sm font-medium w-40">{label}</label>
                     {type === "checkbox" ? (
                       <Input
                         type="checkbox"
