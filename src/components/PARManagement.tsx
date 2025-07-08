@@ -17,27 +17,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Search, Save, Plus, Trash2, AlertCircle } from "lucide-react";
+import { Search, Plus, Pencil } from "lucide-react";
 
 interface IngredientPAR {
   id: string;
@@ -45,652 +36,368 @@ interface IngredientPAR {
   category: string;
   parLevel: number;
   unit: string;
-  priority: "A" | "B" | "C";
-  notes: string;  
+  notes: string;
   estimated_time: number;
   menu_relevance: boolean;
+  currentQty: number;
+  isLunchItem: boolean;
+  needsFryer: boolean;
 }
+
+const getAutoPriority = ({
+  currentQty,
+  parLevel,
+  menu_relevance,
+  estimated_time,
+  needsFryer,
+  name,
+  isLunchItem,
+}: Omit<IngredientPAR, "id" | "category" | "unit" | "notes">): "A" | "B" | "C" => {
+  const percent = (currentQty / parLevel) * 100;
+  if (name.toLowerCase().includes("prime rib seasoning")) return "A";
+  if (percent <= 30) return "A";
+  if (needsFryer) return "A";
+  if (estimated_time >= 90) return "A";
+  if (isLunchItem) return "A";
+  if (menu_relevance && percent <= 75) return "B";
+  return "C";
+};
+
+const getPriorityColor = (priority: "A" | "B" | "C") => {
+  switch (priority) {
+    case "A":
+      return "bg-red-100 text-red-800 hover:bg-red-200";
+    case "B":
+      return "bg-yellow-100 text-yellow-800 hover:bg-yellow-200";
+    case "C":
+      return "bg-green-100 text-green-800 hover:bg-green-200";
+    default:
+      return "";
+  }
+};
 
 const PARManagement = () => {
   const [ingredients, setIngredients] = useState<IngredientPAR[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("All");
-  const [editingIngredient, setEditingIngredient] = useState<IngredientPAR | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editedIngredient, setEditedIngredient] = useState<Partial<IngredientPAR>>({});
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [newIngredient, setNewIngredient] = useState<Partial<IngredientPAR>>({
     name: "",
     category: "Protein",
     parLevel: 0,
     unit: "lbs",
-    priority: "B",
     notes: "",
     estimated_time: 15,
     menu_relevance: false,
+    isLunchItem: false,
+    needsFryer: false,
   });
 
-  useEffect(() => {
-    const fetchIngredients = async () => {
-      const { data, error } = await supabase.from("items").select("*");
-      if (error) {
-        console.error("❌ Failed to fetch ingredients:", error.message);
-        return;
-      }
-      const formatted = data.map((item) => ({
+  const fetchIngredients = async () => {
+    const { data: items, error: itemsError } = await supabase
+      .from("items")
+      .select("*");
+    const { data: stock, error: stockError } = await supabase
+      .from("stock")
+      .select("*");
+
+    if (itemsError || stockError) {
+      console.error(
+        "❌ Failed to fetch ingredients or stock:",
+        itemsError?.message || stockError?.message
+      );
+      return;
+    }
+
+    const formatted = items.map((item) => {
+      const stockEntry = stock.find((s) => s.item_id === item.id);
+      return {
         id: item.id,
         name: item.name,
         category: item.category,
         parLevel: item.par_level,
         unit: item.unit,
-        priority: item.priority,
         notes: item.notes,
         estimated_time: item.estimated_time,
         menu_relevance: item.menu_relevance,
-      }));
-      setIngredients(formatted);
-    };
+        currentQty: stockEntry?.quantity ?? 0,
+        isLunchItem: item.is_lunch_item ?? false,
+        needsFryer: item.needs_fryer ?? false,
+      };
+    });
+
+    setIngredients(formatted);
+  };
+
+  useEffect(() => {
     fetchIngredients();
   }, []);
-   
 
-  const categories = [
-    "All",
-    "Protein",
-    "Produce",
-    "Dairy",
-    "Dry Goods",
-    "Spices",
-    "Sauces",
-    "Vegetables",
-    "Other",
-  ];
+  const handleAddIngredient = async () => {
+    const { error } = await supabase.from("items").insert([
+      {
+        name: newIngredient.name,
+        category: newIngredient.category,
+        par_level: newIngredient.parLevel,
+        unit: newIngredient.unit,
+        notes: newIngredient.notes,
+        estimated_time: newIngredient.estimated_time,
+        menu_relevance: newIngredient.menu_relevance,
+        is_lunch_item: newIngredient.isLunchItem,
+        needs_fryer: newIngredient.needsFryer,
+      },
+    ]);
 
-  const filteredIngredients = ingredients.filter((ingredient) => {
-    const matchesSearch = ingredient.name
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
-    const matchesCategory =
-      categoryFilter === "All" || ingredient.category === categoryFilter;
-    return matchesSearch && matchesCategory;
-  });
-
-  const handleEditIngredient = (ingredient) => {
-    setEditingIngredient({
-      id: ingredient.id,
-      name: ingredient.name || "",
-      category: ingredient.category || "",
-      parLevel: ingredient.parLevel || 0,
-      unit: ingredient.unit || "",
-      priority: ingredient.priority || "B",
-      notes: ingredient.notes || "",
-      estimated_time: ingredient.estimated_time || 0,
-      menu_relevance: ingredient.menu_relevance ?? false,
-    });
+    if (!error) {
+      setShowAddDialog(false);
+      setNewIngredient({
+        name: "",
+        category: "Protein",
+        parLevel: 0,
+        unit: "lbs",
+        notes: "",
+        estimated_time: 15,
+        menu_relevance: false,
+        isLunchItem: false,
+        needsFryer: false,
+      });
+      fetchIngredients();
+    }
   };
-  
 
-  const handleSaveEdit = async () => {
-    if (!editingIngredient) return;
-  
-    const {
-      id,
-      name,
-      category,
-      parLevel,
-      unit,
-      priority,
-      notes,
-      estimated_time,
-      menu_relevance,
-    } = editingIngredient;
-  
+  const openEditDialog = (ing: IngredientPAR) => {
+    setEditingId(ing.id);
+    setEditedIngredient({ ...ing });
+    setShowEditDialog(true);
+  };
+
+  const handleEditIngredient = async () => {
+    if (!editingId) return;
+
     const { error } = await supabase
       .from("items")
       .update({
-        name,
-        category,
-        par_level: parLevel, // assumes your Supabase column is named 'par_level'
-        unit,
-        priority,
-        notes,
-        estimated_time,
-        menu_relevance,
+        name: editedIngredient.name,
+        category: editedIngredient.category,
+        par_level: editedIngredient.parLevel,
+        unit: editedIngredient.unit,
+        notes: editedIngredient.notes,
+        estimated_time: editedIngredient.estimated_time,
+        menu_relevance: editedIngredient.menu_relevance,
+        is_lunch_item: editedIngredient.isLunchItem,
+        needs_fryer: editedIngredient.needsFryer,
       })
-      .eq("id", id);
-  
-    if (error) {
-      console.error("❌ Failed to update ingredient:", error.message);
-      alert("Failed to update the ingredient. Please try again.");
-      return;
-    }
-  
-    // Optional: log or toast success message
-    console.log("✅ Ingredient updated successfully");
-  
-    // Update local state
-    setIngredients((prev) =>
-      prev.map((ing) => (ing.id === id ? { ...ing, ...editingIngredient } : ing))
-    );
-  
-    // Exit edit mode
-    setEditingIngredient(null);
-  };
-  
-  
+      .eq("id", editingId);
 
-  const handleCancelEdit = () => {
-    setEditingIngredient(null);
-  };
-
-  const handleAddIngredient = async () => {
-    const ingredientToAdd = {
-      name: newIngredient.name || "",
-      category: newIngredient.category || "Protein",
-      par_level: newIngredient.parLevel || 0,
-      unit: newIngredient.unit || "",
-      priority: newIngredient.priority || "B",
-      notes: newIngredient.notes || "",
-      estimated_time: newIngredient.estimated_time || 15,
-      menu_relevance: newIngredient.menu_relevance || false,
-      created_at: new Date().toISOString(),
-    };
-    const { data, error } = await supabase.from("items").insert([ingredientToAdd]).select();
-    if (error) {
-      console.error("❌ Supabase insert failed:", error.message);
-      return;
-    }
-    setIngredients([
-      ...ingredients,
-      {
-        id: data[0].id,
-        ...ingredientToAdd,
-        parLevel: ingredientToAdd.par_level,
-      },
-    ]);
-    setShowAddDialog(false);
-    setNewIngredient({
-      name: "",
-      category: "Protein",
-      parLevel: 0,
-      unit: "lbs",
-      priority: "B",
-      notes: "",
-      estimated_time: 15,
-      menu_relevance: false,
-    });
-  };
-  
-
-  const handleDeleteIngredient = async (id: string) => {
-    const { error } = await supabase
-      .from("items")
-      .delete()
-      .eq("id", id);
-  
-    if (error) {
-      console.error("❌ Failed to delete ingredient:", error.message);
-      return;
-    }
-  
-    setIngredients(ingredients.filter((ing) => ing.id !== id));
-  };
-  
-
-  const getPriorityColor = (priority: "A" | "B" | "C") => {
-    switch (priority) {
-      case "A":
-        return "bg-red-100 text-red-800 hover:bg-red-200";
-      case "B":
-        return "bg-yellow-100 text-yellow-800 hover:bg-yellow-200";
-      case "C":
-        return "bg-green-100 text-green-800 hover:bg-green-200";
-      default:
-        return "";
+    if (!error) {
+      setShowEditDialog(false);
+      setEditingId(null);
+      setEditedIngredient({});
+      fetchIngredients();
     }
   };
+
+  const filteredIngredients = ingredients.filter((ingredient) =>
+    ingredient.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
-    <div className="bg-background p-6 rounded-lg shadow-sm w-full">
+    <div className="p-6 w-full">
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl font-bold">PAR Level Management</CardTitle>
-          <CardDescription>
-            Set and adjust target inventory levels for all ingredients
-          </CardDescription>
+          <CardTitle>PAR Level Management</CardTitle>
+          <CardDescription>Set and adjust target inventory levels</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col space-y-4">
-            <div className="flex flex-col md:flex-row justify-between gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-                <Input
-                  placeholder="Search ingredients..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-              <div className="flex gap-2">
-                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category} value={category}>
-                        {category}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <AlertDialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-                  <AlertDialogTrigger asChild>
-                    <Button className="flex items-center gap-1">
-                      <Plus size={16} />
-                      Add Ingredient
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Add New Ingredient</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Enter the details for the new ingredient and its PAR level.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <div className="grid gap-4 py-4">
-                      {['name', 'category', 'parLevel', 'unit', 'priority', 'notes'].map((field) => (
-                        <div
-                          key={field}
-                          className="grid grid-cols-4 items-center gap-4"
-                        >
-                          <label className="text-right text-sm capitalize">
-                            {field === 'parLevel' ? 'PAR Level' : field}
-                          </label>
-                          {field === 'category' || field === 'priority' ? (
-                            <Select
-                              value={newIngredient[field] || (field === 'category' ? 'Protein' : 'B')}
-                              onValueChange={(value) =>
-                                setNewIngredient({ ...newIngredient, [field]: value })
-                              }
-                            >
-                              <SelectTrigger className="col-span-3">
-                                <SelectValue placeholder={`Select ${field}`} />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {(field === 'category'
-                                  ? categories.filter((c) => c !== 'All')
-                                  : ['A', 'B', 'C']
-                                ).map((opt) => (
-                                  <SelectItem value={opt} key={opt}>
-                                    {field === 'priority'
-                                      ? `${opt} - ${opt === 'A' ? 'High' : opt === 'B' ? 'Medium' : 'Low'}`
-                                      : opt}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          ) : (
-                            <Input
-                              className="col-span-3"
-                              type={field === 'parLevel' ? 'number' : 'text'}
-                              value={newIngredient[field]?.toString() || ''}
-                              onChange={(e) =>
-                                setNewIngredient({
-                                  ...newIngredient,
-                                  [field]: field === 'parLevel' ? parseInt(e.target.value) : e.target.value,
-                                })
-                              }
-                            />
-                          )}
-                        </div>
-                      ))}
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <label className="text-right text-sm">Estimated Time (min)</label>
+          <div className="flex gap-4 mb-4">
+            <div className="relative w-full">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search ingredients..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+            <AlertDialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+              <AlertDialogTrigger asChild>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" /> Add Ingredient
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Add New Ingredient</AlertDialogTitle>
+                </AlertDialogHeader>
+                <div className="grid grid-cols-4 gap-4 py-4">
+                  {[
+                    { label: "Name", field: "name", type: "text" },
+                    { label: "Category", field: "category", type: "text" },
+                    { label: "PAR Level", field: "parLevel", type: "number" },
+                    { label: "Unit", field: "unit", type: "text" },
+                    { label: "Notes", field: "notes", type: "text" },
+                    { label: "Estimated Time", field: "estimated_time", type: "number" },
+                    { label: "Menu Relevance", field: "menu_relevance", type: "checkbox" },
+                    { label: "Lunch Item", field: "isLunchItem", type: "checkbox" },
+                    { label: "Needs Fryer", field: "needsFryer", type: "checkbox" },
+                  ].map(({ label, field, type }) => (
+                    <div key={field} className="col-span-4 sm:col-span-2 flex items-center gap-2">
+                      <label className="text-sm font-medium w-32">{label}</label>
+                      {type === "checkbox" ? (
                         <Input
-                          className="col-span-3"
-                          type="number"
-                          value={newIngredient.estimated_time?.toString() || '0'}
+                          type="checkbox"
+                          checked={!!newIngredient[field]}
                           onChange={(e) =>
                             setNewIngredient({
                               ...newIngredient,
-                              estimated_time: parseInt(e.target.value),
+                              [field]: e.target.checked,
                             })
                           }
+                          className="h-4 w-4"
                         />
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <label className="text-right text-sm">Menu Relevant</label>
-                        <Select
-                          value={newIngredient.menu_relevance ? 'true' : 'false'}
-                          onValueChange={(value) =>
+                      ) : (
+                        <Input
+                          type={type}
+                          value={newIngredient[field]?.toString() || ""}
+                          onChange={(e) =>
                             setNewIngredient({
                               ...newIngredient,
-                              menu_relevance: value === 'true',
+                              [field]: type === "number"
+                                ? parseInt(e.target.value)
+                                : e.target.value,
                             })
                           }
-                        >
-                          <SelectTrigger className="col-span-3">
-                            <SelectValue placeholder="Select..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="true">Yes</SelectItem>
-                            <SelectItem value="false">No</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                          className="w-full"
+                        />
+                      )}
                     </div>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleAddIngredient}>Add Ingredient</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            </div>
-  
-            <Tabs defaultValue="table" className="w-full">
-    <TabsList className="grid w-[200px] grid-cols-2">
-      <TabsTrigger value="table">Table</TabsTrigger>
-      <TabsTrigger value="cards">Cards</TabsTrigger>
-    </TabsList>
-  
-              {/* Table View */}
-              <TabsContent value="table" className="mt-4">
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead>PAR Level</TableHead>
-                        <TableHead>Unit</TableHead>
-                        <TableHead>Priority</TableHead>
-                        <TableHead>Notes</TableHead>
-                        <TableHead>Estimated Time</TableHead>
-                        <TableHead>Menu Relevant</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredIngredients.map((ingredient) => (
-                        <TableRow key={ingredient.id}>
-                          <TableCell>
-                            {editingIngredient?.id === ingredient.id ? (
-                              <Input
-                                value={editingIngredient.name}
-                                onChange={(e) =>
-                                  setEditingIngredient({
-                                    ...editingIngredient,
-                                    name: e.target.value,
-                                  })
-                                }
-                              />
-                            ) : (
-                              ingredient.name
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {editingIngredient?.id === ingredient.id ? (
-                              <Select
-                                value={editingIngredient.category}
-                                onValueChange={(value) =>
-                                  setEditingIngredient({
-                                    ...editingIngredient,
-                                    category: value,
-                                  })
-                                }
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select category" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {categories.filter(c => c !== "All").map(category => (
-                                    <SelectItem key={category} value={category}>
-                                      {category}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              ingredient.category
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {editingIngredient?.id === ingredient.id ? (
-                              <Input
-                                type="number"
-                                value={editingIngredient.parLevel.toString()}
-                                onChange={(e) =>
-                                  setEditingIngredient({
-                                    ...editingIngredient,
-                                    parLevel: parseInt(e.target.value) || 0,
-                                  })
-                                }
-                              />
-                            ) : (
-                              ingredient.parLevel
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {editingIngredient?.id === ingredient.id ? (
-                              <Input
-                                value={editingIngredient.unit}
-                                onChange={(e) =>
-                                  setEditingIngredient({
-                                    ...editingIngredient,
-                                    unit: e.target.value,
-                                  })
-                                }
-                              />
-                            ) : (
-                              ingredient.unit
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {editingIngredient?.id === ingredient.id ? (
-                              <Select
-                                value={editingIngredient.priority}
-                                onValueChange={(value: "A" | "B" | "C") =>
-                                  setEditingIngredient({
-                                    ...editingIngredient,
-                                    priority: value,
-                                  })
-                                }
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select priority" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="A">A - High</SelectItem>
-                                  <SelectItem value="B">B - Medium</SelectItem>
-                                  <SelectItem value="C">C - Low</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              <Badge className={getPriorityColor(ingredient.priority)}>
-                                {ingredient.priority}
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {editingIngredient?.id === ingredient.id ? (
-                              <Input
-                                value={editingIngredient.notes}
-                                onChange={(e) =>
-                                  setEditingIngredient({
-                                    ...editingIngredient,
-                                    notes: e.target.value,
-                                  })
-                                }
-                              />
-                            ) : (
-                              ingredient.notes
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {editingIngredient?.id === ingredient.id ? (
-                              <Input
-                                type="number"
-                                value={editingIngredient.estimated_time.toString()}
-                                onChange={(e) =>
-                                  setEditingIngredient({
-                                    ...editingIngredient,
-                                    estimated_time: parseInt(e.target.value) || 0,
-                                  })
-                                }
-                              />
-                            ) : (
-                              `${ingredient.estimated_time} min`
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {editingIngredient?.id === ingredient.id ? (
-                              <Select
-                                value={editingIngredient.menu_relevance ? "true" : "false"}
-                                onValueChange={(value) =>
-                                  setEditingIngredient({
-                                    ...editingIngredient,
-                                    menu_relevance: value === "true",
-                                  })
-                                }
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="true">Yes</SelectItem>
-                                  <SelectItem value="false">No</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              ingredient.menu_relevance ? "Yes" : "No"
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {editingIngredient?.id === ingredient.id ? (
-                              <div className="flex justify-end gap-2">
-                                <Button size="sm" onClick={handleSaveEdit}>
-                                  Save
-                                </Button>
-                                <Button size="sm" variant="outline" onClick={handleCancelEdit}>
-                                  Cancel
-                                </Button>
-                              </div>
-                            ) : (
-                              <div className="flex justify-end gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleEditIngredient(ingredient)}
-                                >
-                                  Edit
-                                </Button>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button size="sm" variant="destructive">
-                                      <Trash2 size={16} />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        This will permanently delete {ingredient.name}.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction onClick={() => handleDeleteIngredient(ingredient.id)}>
-                                        Delete
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </div>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </TabsContent>
-  
-              {/* Cards View */}
-              <TabsContent value="cards" className="mt-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredIngredients.map((ingredient) => (
-                    <Card key={ingredient.id}>
-                      <CardHeader className="pb-2">
-                        <div className="flex justify-between items-start">
-                          <CardTitle>{ingredient.name}</CardTitle>
-                          <Badge className={getPriorityColor(ingredient.priority)}>
-                            Priority {ingredient.priority}
-                          </Badge>
-                        </div>
-                        <CardDescription>{ingredient.category}</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          <div className="flex justify-between">
-                            <span className="text-sm font-medium">PAR Level:</span>
-                            <span>{ingredient.parLevel} {ingredient.unit}</span>
-                          </div>
-                          {ingredient.notes && (
-                            <div className="text-sm text-gray-500">
-                              <span className="font-medium">Notes:</span> {ingredient.notes}
-                            </div>
-                          )}
-                          <div className="flex justify-between text-sm">
-                            <span className="font-medium">Est. Time:</span>
-                            <span>{ingredient.estimated_time} min</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="font-medium">Menu Relevant:</span>
-                            <span>{ingredient.menu_relevance ? "Yes" : "No"}</span>
-                          </div>
-                          <div className="flex justify-end gap-2 pt-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEditIngredient(ingredient)}
-                            >
-                              Edit
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button size="sm" variant="destructive">
-                                  <Trash2 size={16} />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This will permanently delete {ingredient.name}.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDeleteIngredient(ingredient.id)}>
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
                   ))}
                 </div>
-              </TabsContent>
-            </Tabs>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleAddIngredient}>
+                    Add
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
+
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>PAR</TableHead>
+                  <TableHead>Current Qty</TableHead>
+                  <TableHead>Unit</TableHead>
+                  <TableHead>Priority</TableHead>
+                  <TableHead>Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredIngredients.map((ing) => {
+                  const priority = getAutoPriority(ing);
+                  return (
+                    <TableRow key={ing.id}>
+                      <TableCell>{ing.name}</TableCell>
+                      <TableCell>{ing.category}</TableCell>
+                      <TableCell>{ing.parLevel}</TableCell>
+                      <TableCell>{ing.currentQty}</TableCell>
+                      <TableCell>{ing.unit}</TableCell>
+                      <TableCell>
+                        <Badge className={getPriorityColor(priority)}>
+                          {priority}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          onClick={() => openEditDialog(ing)}
+                        >
+                          <Pencil size={16} />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+
+          <AlertDialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Edit Ingredient</AlertDialogTitle>
+              </AlertDialogHeader>
+              <div className="grid grid-cols-4 gap-4 py-4">
+                {[
+                  { label: "Name", field: "name", type: "text" },
+                  { label: "Category", field: "category", type: "text" },
+                  { label: "PAR Level", field: "parLevel", type: "number" },
+                  { label: "Unit", field: "unit", type: "text" },
+                  { label: "Notes", field: "notes", type: "text" },
+                  { label: "Estimated Time", field: "estimated_time", type: "number" },
+                  { label: "Menu Relevance", field: "menu_relevance", type: "checkbox" },
+                  { label: "Lunch Item", field: "isLunchItem", type: "checkbox" },
+                  { label: "Needs Fryer", field: "needsFryer", type: "checkbox" },
+                ].map(({ label, field, type }) => (
+                  <div key={field} className="col-span-4 sm:col-span-2 flex items-center gap-2">
+                    <label className="text-sm font-medium w-32">{label}</label>
+                    {type === "checkbox" ? (
+                      <Input
+                        type="checkbox"
+                        checked={!!editedIngredient[field]}
+                        onChange={(e) =>
+                          setEditedIngredient({
+                            ...editedIngredient,
+                            [field]: e.target.checked,
+                          })
+                        }
+                        className="h-4 w-4"
+                      />
+                    ) : (
+                      <Input
+                        type={type}
+                        value={editedIngredient[field]?.toString() || ""}
+                        onChange={(e) =>
+                          setEditedIngredient({
+                            ...editedIngredient,
+                            [field]:
+                              type === "number"
+                                ? parseInt(e.target.value)
+                                : e.target.value,
+                          })
+                        }
+                        className="w-full"
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+              <AlertDialogFooter>
+                <AlertDialogCancel
+                  onClick={() => {
+                    setShowEditDialog(false);
+                    setEditingId(null);
+                  }}
+                >
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction onClick={handleEditIngredient}>
+                  Save
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </CardContent>
       </Card>
     </div>
   );
-  
 };
 
 export default PARManagement;

@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { supabase } from "@/lib/supabaseClient";
-      
+
 interface InventoryItem {
   id: string;
   name: string;
@@ -40,26 +40,30 @@ const InventoryForm = ({ onSave = () => {} }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+
   useEffect(() => {
     const fetchInventory = async () => {
       const { data: itemsData, error: itemsError } = await supabase
         .from("items")
         .select("*");
-  
+
       if (itemsError) {
         console.error("❌ Error fetching items:", itemsError.message);
         return;
       }
-  
+
       const { data: stockData, error: stockError } = await supabase
         .from("stock")
         .select("*");
-  
+
       if (stockError) {
         console.error("❌ Error fetching stock:", stockError.message);
         return;
       }
-  
+
       const inventoryItems: InventoryItem[] = itemsData.map((item) => {
         const stock = stockData.find((s) => s.item_id === item.id);
         return {
@@ -71,13 +75,12 @@ const InventoryForm = ({ onSave = () => {} }) => {
           currentStock: stock?.quantity || 0,
         };
       });
-  
+
       setInventory(inventoryItems);
     };
-  
+
     fetchInventory();
   }, []);
-
 
   const categories = [
     "all",
@@ -94,26 +97,33 @@ const InventoryForm = ({ onSave = () => {} }) => {
   };
 
   const handleSave = async () => {
-    console.log("📦 Saving inventory to Supabase:", inventory);
-  
+    setIsSaving(true);
+    setSaveSuccess(false);
+    setSaveError(false);
+
     const formattedStock = inventory.map(item => ({
       item_id: item.id,
       quantity: item.currentStock,
     }));
-  
+
     const { data, error } = await supabase.from("stock").upsert(formattedStock, {
       onConflict: ["item_id"],
     });
-  
+
     if (error) {
       console.error("❌ Error saving stock to Supabase:", error.message);
+      setSaveError(true);
     } else {
       console.log("✅ Stock saved successfully:", data);
+      setSaveSuccess(true);
     }
+
+    setIsSaving(false);
+    setTimeout(() => {
+      setSaveSuccess(false);
+      setSaveError(false);
+    }, 3000);
   };
-  
-  
-  
 
   const getStatusBadge = (current: number, par: number) => {
     const ratio = current / par;
@@ -216,8 +226,7 @@ const InventoryForm = ({ onSave = () => {} }) => {
                       {getStatusBadge(item.currentStock, item.parLevel)}
                     </TableCell>
                     <TableCell>
-                      {Math.max(0, item.parLevel - item.currentStock)}{" "}
-                      {item.unit}
+                      {Math.max(0, item.parLevel - item.currentStock)} {item.unit}
                     </TableCell>
                   </TableRow>
                 ))
@@ -232,9 +241,15 @@ const InventoryForm = ({ onSave = () => {} }) => {
           </Table>
         </div>
         <div className="flex justify-end mt-6">
-          <Button onClick={handleSave} className="flex items-center gap-2">
+          <Button onClick={handleSave} className="flex items-center gap-2" disabled={isSaving}>
             <Save className="h-4 w-4" />
-            Save Inventory
+            {isSaving
+              ? "Saving..."
+              : saveSuccess
+              ? "Saved ✔️"
+              : saveError
+              ? "Error ❌"
+              : "Save Inventory"}
           </Button>
         </div>
       </CardContent>
@@ -243,3 +258,4 @@ const InventoryForm = ({ onSave = () => {} }) => {
 };
 
 export default InventoryForm;
+

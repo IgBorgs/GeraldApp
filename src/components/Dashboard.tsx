@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChefHat, Clipboard, AlertCircle } from "lucide-react";
+import { ChefHat, Clipboard, AlertCircle } from "lucide-react"; 
 import Settings from "./Settings";
 import InventoryForm from "./InventoryForm";
 import PrepListDisplay from "./PrepListDisplay";
