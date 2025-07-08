@@ -16,6 +16,8 @@ import { motion } from "framer-motion";
 import { ChefHat, Clipboard, Settings } from "lucide-react";
 import Tutorial from "./Tutorial";
 import QuickStartGuide from "./QuickStartGuide";
+import Charts from "./Charts";
+
 
 const Home = () => {
   return (
@@ -48,12 +50,7 @@ const Home = () => {
             <p className="text-muted-foreground">Kitchen Prep Management</p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button size="sm">
-            <Clipboard className="h-4 w-4 mr-2" />
-            New Prep List
-          </Button>
-        </div>
+        
       </header>
       <Card className="mb-8">
         <CardContent className="p-6">
@@ -84,11 +81,12 @@ const Home = () => {
         </CardContent>
       </Card>
       <Tabs defaultValue="dashboard" className="w-full">
-        <TabsList className="grid grid-cols-4 mb-8">
+        <TabsList className="grid grid-cols-5 mb-8">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="inventory">Inventory</TabsTrigger>
           <TabsTrigger value="par">PAR Levels</TabsTrigger>
           <TabsTrigger value="prep">Prep Lists</TabsTrigger>
+          <TabsTrigger value="charts">Charts View</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard" className="bg-background">
@@ -106,7 +104,12 @@ const Home = () => {
         <TabsContent value="prep" className="bg-background">
           <PrepListDisplay />
         </TabsContent>
+
+        <TabsContent value="charts" className="bg-background">
+          <Charts />
+        </TabsContent>
       </Tabs>
+
       <footer className="mt-12 text-center text-sm text-muted-foreground">
         <p>
           © {new Date().getFullYear()} Gerald's Prep List Generator. All rights
