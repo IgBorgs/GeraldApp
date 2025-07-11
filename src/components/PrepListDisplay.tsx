@@ -7,14 +7,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Search, Filter, ChevronDown } from "lucide-react";
+import { Search, Filter, ChevronDown, Clipboard } from "lucide-react";
 import { getAutoPriority, getPriorityColor } from "@/lib/priority";
+import PrepListPDF from "@/components/PrepListPDF";
+import { pdf } from "@react-pdf/renderer";
 
 interface PrepItem {
   id: string;
   item_id: string;
   name: string;
-  // quantity: number; // não vamos mais mostrar quantity
   unit: string;
   priority: "A" | "B" | "C";
   completed: boolean;
@@ -33,6 +34,9 @@ const PrepListDisplay = () => {
       const { data: items, error: itemsError } = await supabase.from("items").select("*");
       const { data: stock, error: stockError } = await supabase.from("stock").select("*");
 
+      console.log("⏩ items do banco:", items);
+      console.log("⏩ stock do banco:", stock);
+
       if (itemsError || stockError) {
         console.error("❌ Error fetching items/stock:", itemsError?.message || stockError?.message);
         return;
@@ -42,7 +46,6 @@ const PrepListDisplay = () => {
         .map((item) => {
           const stockItem = stock.find((s) => s.item_id === item.id);
           const currentStock = stockItem?.quantity ?? 0;
-          const neededQty = Math.max(0, item.par_level - currentStock);
 
           const priority = getAutoPriority({
             currentQty: currentStock,
@@ -54,24 +57,24 @@ const PrepListDisplay = () => {
             isLunchItem: item.is_lunch_item,
           });
 
+          console.log("🔎 Item:", item.name, "| Current:", currentStock, "| Par:", item.par_level, "| Priority:", priority);
+
+          if (!priority) return null;
+
           return {
             id: item.id,
             item_id: item.id,
             name: item.name,
-            // quantity: neededQty,
             unit: item.unit,
             priority,
             completed: false,
             estimatedTime: item.estimated_time || 15,
-            recipeQty: item.default_recipe_qty, // <-- só mostra recipes!
+            recipeQty: item.default_recipe_qty,
           };
         })
-        .filter((item) => {
-          // Só mostra se tiver que produzir algo e tiver receita definida
-          // Se quiser mostrar todos os que precisa fazer, mesmo sem recipeQty, só filtre por neededQty > 0 (ajuste conforme preferir)
-          return item.recipeQty && item.recipeQty.toString().trim() !== "";
-        });
+        .filter(Boolean);
 
+      console.log("✅ Itens visíveis no prep list:", generatedPrepItems);
       setPrepItems(generatedPrepItems);
     };
 
@@ -105,8 +108,45 @@ const PrepListDisplay = () => {
 
   const report = generateDailyReport();
 
+  const handleExportPDF = async () => {
+    const today = new Date().toISOString().split("T")[0];
+    const blob = await pdf(
+      <PrepListPDF
+        items={sortedItems.map(item => ({
+          name: item.name,
+          quantity: item.recipeQty ?? "-",
+          unit: item.unit,
+          priority: item.priority,
+          completed: item.completed,
+          estimatedTime: item.estimatedTime,
+        }))}
+        prepStartTime={null}
+        prepEndTime={null}
+      />
+    ).toBlob();
+
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = `PrepList-${today}.pdf`;
+    link.click();
+  };
+
   return (
     <div className="bg-background p-6 rounded-lg shadow-sm w-full">
+
+      <div className="flex flex-row justify-end mb-4">
+        <Button
+          onClick={handleExportPDF}
+          variant="outline"
+          className="flex items-center gap-2"
+          title="Export as PDF"
+        >
+          <Clipboard className="h-4 w-4" />
+          Export as PDF
+        </Button>
+      </div>
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
         <div>
           <h2 className="text-2xl font-bold text-gray-800">Prep List</h2>
@@ -183,7 +223,7 @@ const PrepListDisplay = () => {
                           </label>
                           <div className="text-sm text-gray-500 flex items-center gap-2">
                             {item.recipeQty
-                              ? <span className="font-bold text-primary">{item.recipeQty} {typeof item.recipeQty === "string" && item.recipeQty.toUpperCase().includes('R') ? '' : 'R'}</span>
+                              ? <span className="font-bold text-primary">{item.recipeQty} {typeof item.recipeQty === "string" && item.recipeQty.toUpperCase().includes('R') ? '' : 'receitas'}</span>
                               : <span className="text-gray-400 italic">Qtd. não definida</span>
                             }
                             <span>• {item.estimatedTime} min</span>
