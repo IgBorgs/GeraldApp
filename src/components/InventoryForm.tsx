@@ -150,7 +150,7 @@ const InventoryForm = ({ onSave = () => {} }) => {
   return (
     <Card className="w-full bg-background">
       <CardHeader>
-        <CardTitle className="text-2xl">Current Inventory</CardTitle>
+        <CardTitle className="text-2xl font-bold ">Current Inventory</CardTitle>
         <CardDescription>
           Enter the current stock levels for each ingredient. The system will
           automatically calculate what needs to be prepped.

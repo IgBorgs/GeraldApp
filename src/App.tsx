@@ -7,25 +7,24 @@ import PARManagement from "./components/PARManagement";
 import PrepListDisplay from "./components/PrepListDisplay";
 import InventoryForm from "./components/InventoryForm";
 import LoadingScreen from "./components/LoadingScreen";
-
+import { PrepListProvider } from "./components/PrepListContext";
 
 
 function App() {
   return (
     <ThemeProvider defaultTheme="system" storageKey="gerald-prep-theme">
-      <Suspense fallback={<p>Loading...</p>}>
-        <>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/par-management" element={<PARManagement />} />
-            <Route path="/prep" element={<PrepListDisplay />} />
-            <Route path="/inventory" element={<InventoryForm />} />
-            
-
-          </Routes>
-          {import.meta.env.VITE_TEMPO === "true" && useRoutes(routes)}
-        </>
-      </Suspense>
+      <PrepListProvider>
+        <Suspense fallback={<p>Loading...</p>}>
+          <>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/par-management" element={<PARManagement />} />
+              <Route path="/prep" element={<PrepListDisplay />} />
+              <Route path="/inventory" element={<InventoryForm />} />
+            </Routes>
+          </>
+        </Suspense>
+      </PrepListProvider>
     </ThemeProvider>
   );
 }

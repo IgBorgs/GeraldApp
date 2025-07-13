@@ -172,7 +172,7 @@ const PARManagement = () => {
     <div className="p-6 w-full">
       <Card>
         <CardHeader>
-          <CardTitle>PAR Level Management</CardTitle>
+          <CardTitle className="text-2xl font-bold">PAR Level Management</CardTitle>
           <CardDescription>Set and adjust target inventory levels</CardDescription>
         </CardHeader>
         <CardContent>

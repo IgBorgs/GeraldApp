@@ -7,9 +7,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChefHat, Clipboard, AlertCircle } from "lucide-react"; 
+import { ChefHat, Clipboard, AlertCircle } from "lucide-react";
 import Settings from "./Settings";
-import { supabase } from "@/lib/supabaseClient";
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -29,6 +28,7 @@ import {
   View,
   StyleSheet,
 } from "@react-pdf/renderer";
+import { usePrepList } from "./PrepListContext"; // ✅ NEW
 
 interface DashboardProps {
   userName?: string;
@@ -105,6 +105,14 @@ const PrepListPDF = ({
 );
 
 const Dashboard = ({ userName = "Chef" }: DashboardProps) => {
+  const { prepList, isLoading } = usePrepList(); // ✅ NEW
+  console.log("📦 prepList from context:", prepList);
+
+  const [prepStartedAt, setPrepStartedAt] = useState<Date | null>(null);
+  const [elapsedTime, setElapsedTime] = useState("00:00:00");
+  const [showDialog, setShowDialog] = useState(false);
+  const [prepStartTime, setPrepStartTime] = useState<Date | null>(null);
+  const [prepEndTime, setPrepEndTime] = useState<Date | null>(null);
   const [summaryData, setSummaryData] = useState({
     totalItemsNeeded: 0,
     priorityA: 0,
@@ -112,13 +120,21 @@ const Dashboard = ({ userName = "Chef" }: DashboardProps) => {
     priorityC: 0,
     lastUpdated: "",
   });
-  const [prepStartedAt, setPrepStartedAt] = useState<Date | null>(null);
-  const [elapsedTime, setElapsedTime] = useState("00:00:00");
-  const [showDialog, setShowDialog] = useState(false);
-  const [prepStartTime, setPrepStartTime] = useState<Date | null>(null);
-  const [prepEndTime, setPrepEndTime] = useState<Date | null>(null);
 
-  useEffect(() => { fetchPrepListSummary(); }, []);
+  useEffect(() => {
+    if (!isLoading && prepList.length > 0) {
+      const neededItems = prepList.filter((i) => i.needed_quantity > 0);
+      setSummaryData({
+        totalItemsNeeded: neededItems.length,
+        priorityA: neededItems.filter((i) => i.priority === "A").length,
+        priorityB: neededItems.filter((i) => i.priority === "B").length,
+        priorityC: neededItems.filter((i) => i.priority === "C").length,
+        lastUpdated: new Date().toLocaleString(),
+      });
+
+    }
+  }, [prepList, isLoading]);
+  
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -135,43 +151,12 @@ const Dashboard = ({ userName = "Chef" }: DashboardProps) => {
     return () => clearInterval(timer);
   }, [prepStartedAt]);
 
-  const fetchPrepListSummary = async () => {
-    const today = new Date().toISOString().split("T")[0];
-    const { data, error } = await supabase
-      .from("prep_list")
-      .select("*")
-      .eq("date", today);
-    if (error || !data) return console.error("❌ Prep list fetch failed", error);
-    const incompleteItems = data.filter((item) => item.completed === false);
-    setSummaryData({
-      totalItemsNeeded: incompleteItems.length,
-      priorityA: incompleteItems.filter((i) => i.priority === "A").length,
-      priorityB: incompleteItems.filter((i) => i.priority === "B").length,
-      priorityC: incompleteItems.filter((i) => i.priority === "C").length,
-      lastUpdated: new Date().toLocaleString(),
-    });
-  };
-
   const handleGeneratePDF = async () => {
     const today = new Date().toISOString().split("T")[0];
-    const { data, error } = await supabase
-      .from("prep_list")
-      .select("id, item_id, name, needed_quantity, unit, priority, completed")
-      .eq("date", today);
-    if (error || !data) {
-      alert("Failed to fetch today's prep list");
-      console.error(error);
-      return;
-    }
-    const formattedItems = data.map((item) => ({
-      id: item.id,
-      item_id: item.item_id,
-      name: item.name,
-      quantity: item.needed_quantity,
-      unit: item.unit,
-      priority: item.priority,
-      completed: item.completed,
-      estimatedTime: 15,
+    const formattedItems = prepList.map((item) => ({
+      ...item,
+      quantity: item.quantity || 0,
+      estimatedTime: item.estimated_time || 15,
     }));
     const blob = await pdf(
       <PrepListPDF
@@ -309,7 +294,7 @@ const Dashboard = ({ userName = "Chef" }: DashboardProps) => {
             <CardContent className="space-y-4">
               <div className="flex items-center gap-2">
                 <AlertCircle className="h-4 w-4 text-amber-500" />
-                <span className="text-sm">Live data from Supabase</span>
+                <span className="text-sm">Live data from app state</span>
               </div>
               <div className="text-sm text-muted-foreground">
                 Last updated: {summaryData.lastUpdated}
@@ -318,7 +303,19 @@ const Dashboard = ({ userName = "Chef" }: DashboardProps) => {
                 variant="outline"
                 size="sm"
                 className="w-full"
-                onClick={fetchPrepListSummary}
+                onClick={() => {
+                  if (!isLoading) {
+                    const incompleteItems = prepList.filter((item) => item.needed_quantity > 0 && !item.completed);
+                    setSummaryData({
+                      totalItemsNeeded: incompleteItems.length,
+                      priorityA: incompleteItems.filter((i) => i.priority === "A").length,
+                      priorityB: incompleteItems.filter((i) => i.priority === "B").length,
+                      priorityC: incompleteItems.filter((i) => i.priority === "C").length,
+                      lastUpdated: new Date().toLocaleString(),
+                    });
+
+                  }
+                }}
               >
                 Refresh Data
               </Button>
@@ -331,6 +328,7 @@ const Dashboard = ({ userName = "Chef" }: DashboardProps) => {
 };
 
 export default Dashboard;
+
 
 
 
