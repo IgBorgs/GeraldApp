@@ -1,96 +1,54 @@
-import React, { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import React, { useState } from "react";
+import { usePrepList } from "@/components/PrepListContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Search, Filter, ChevronDown, Clipboard } from "lucide-react";
-import { getAutoPriority, getPriorityColor } from "@/lib/priority";
+import { getPriorityColor } from "@/lib/priority";
 import PrepListPDF from "@/components/PrepListPDF";
 import { pdf } from "@react-pdf/renderer";
 
 interface PrepItem {
-  id: string;
+  id?: string;
   item_id: string;
   name: string;
   unit: string;
   priority: "A" | "B" | "C";
   completed: boolean;
-  estimatedTime: number;
-  recipeQty?: string | number;
+  estimated_time: number;
+  quantity: number;
+  needed_quantity: number;
 }
 
 const PrepListDisplay = () => {
-  const [prepItems, setPrepItems] = useState<PrepItem[]>([]);
+  const {
+    prepList: prepItems,
+    isLoading,
+    error,
+    markItemCompleted,
+  } = usePrepList();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("priority");
   const [activeTab, setActiveTab] = useState("all");
 
-  useEffect(() => {
-    const fetchPrepList = async () => {
-      const { data: items, error: itemsError } = await supabase.from("items").select("*");
-      const { data: stock, error: stockError } = await supabase.from("stock").select("*");
-
-      console.log("⏩ items do banco:", items);
-      console.log("⏩ stock do banco:", stock);
-
-      if (itemsError || stockError) {
-        console.error("❌ Error fetching items/stock:", itemsError?.message || stockError?.message);
-        return;
-      }
-
-      const generatedPrepItems = items
-        .map((item) => {
-          const stockItem = stock.find((s) => s.item_id === item.id);
-          const currentStock = stockItem?.quantity ?? 0;
-
-          const priority = getAutoPriority({
-            currentQty: currentStock,
-            parLevel: item.par_level,
-            menu_relevance: item.menu_relevance,
-            estimated_time: item.estimated_time,
-            needsFryer: item.needs_fryer,
-            name: item.name,
-            isLunchItem: item.is_lunch_item,
-          });
-
-          console.log("🔎 Item:", item.name, "| Current:", currentStock, "| Par:", item.par_level, "| Priority:", priority);
-
-          if (!priority) return null;
-
-          return {
-            id: item.id,
-            item_id: item.id,
-            name: item.name,
-            unit: item.unit,
-            priority,
-            completed: false,
-            estimatedTime: item.estimated_time || 15,
-            recipeQty: item.default_recipe_qty,
-          };
-        })
-        .filter(Boolean);
-
-      console.log("✅ Itens visíveis no prep list:", generatedPrepItems);
-      setPrepItems(generatedPrepItems);
-    };
-
-    fetchPrepList();
-  }, []);
+  if (isLoading) return <div className="p-6 text-gray-500">Loading prep list...</div>;
+  if (error) return <div className="p-6 text-red-500">Error: {error}</div>;
 
   const generateDailyReport = () => {
-    const todayItems = prepItems;
-    const totalItems = todayItems.length;
-    const completedItems = todayItems.filter(item => item.completed).length;
-    const totalTime = todayItems.reduce((sum, item) => sum + item.estimatedTime, 0);
-    return { totalItems, completedItems, totalTime, items: todayItems };
-  };
-
-  const handleMarkComplete = async (id: string, completed: boolean) => {
-    setPrepItems((prev) => prev.map((item) => item.id === id ? { ...item, completed } : item));
+    const totalItems = prepItems.length;
+    const completedItems = prepItems.filter((item) => item.completed).length;
+    const totalTime = prepItems.reduce((sum, item) => sum + item.estimated_time, 0);
+    return { totalItems, completedItems, totalTime, items: prepItems };
   };
 
   const filteredItems = prepItems.filter((item) => {
@@ -102,7 +60,7 @@ const PrepListDisplay = () => {
   const sortedItems = [...filteredItems].sort((a, b) => {
     if (sortBy === "priority") return a.priority.localeCompare(b.priority);
     if (sortBy === "name") return a.name.localeCompare(b.name);
-    if (sortBy === "time") return a.estimatedTime - b.estimatedTime;
+    if (sortBy === "time") return a.estimated_time - b.estimated_time;
     return 0;
   });
 
@@ -112,13 +70,13 @@ const PrepListDisplay = () => {
     const today = new Date().toISOString().split("T")[0];
     const blob = await pdf(
       <PrepListPDF
-        items={sortedItems.map(item => ({
+        items={sortedItems.map((item) => ({
           name: item.name,
-          quantity: item.recipeQty ?? "-",
+          quantity: item.quantity,
           unit: item.unit,
           priority: item.priority,
           completed: item.completed,
-          estimatedTime: item.estimatedTime,
+          estimatedTime: item.estimated_time,
         }))}
         prepStartTime={null}
         prepEndTime={null}
@@ -134,7 +92,6 @@ const PrepListDisplay = () => {
 
   return (
     <div className="bg-background p-6 rounded-lg shadow-sm w-full">
-
       <div className="flex flex-row justify-end mb-4">
         <Button
           onClick={handleExportPDF}
@@ -151,7 +108,8 @@ const PrepListDisplay = () => {
         <div>
           <h2 className="text-2xl font-bold text-gray-800">Prep List</h2>
           <p className="text-gray-500 mt-1">
-            {report.completedItems} of {report.totalItems} items completed • {prepItems.filter(i => i.priority === "A").length} high priority
+            {report.completedItems} of {report.totalItems} items completed •{" "}
+            {prepItems.filter((i) => i.priority === "A").length} high priority
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3 mt-4 md:mt-0 w-full md:w-auto">
@@ -210,32 +168,51 @@ const PrepListDisplay = () => {
               {sortedItems.length > 0 ? (
                 <div className="space-y-4">
                   {sortedItems.map((item) => (
-                    <div key={item.id} className={`flex justify-between p-3 border rounded-md ${item.completed ? "bg-muted" : "bg-card"}`}>
+                    <div
+                      key={item.id}
+                      className={`flex justify-between p-3 border rounded-md ${
+                        item.completed ? "bg-muted" : "bg-card"
+                      }`}
+                    >
                       <div className="flex items-center gap-3">
                         <Checkbox
                           id={`item-${item.id}`}
                           checked={item.completed}
-                          onCheckedChange={(checked) => handleMarkComplete(item.id, checked as boolean)}
+                          onCheckedChange={(checked) =>
+                            markItemCompleted(item.id!, checked as boolean)
+                          }
                         />
                         <div>
-                          <label htmlFor={`item-${item.id}`} className={`font-medium ${item.completed ? "line-through text-gray-500" : "text-gray-900"}`}>
+                          <label
+                            htmlFor={`item-${item.id}`}
+                            className={`font-medium ${
+                              item.completed
+                                ? "line-through text-gray-500"
+                                : "text-gray-900"
+                            }`}
+                          >
                             {item.name}
                           </label>
                           <div className="text-sm text-gray-500 flex items-center gap-2">
-                            {item.recipeQty
-                              ? <span className="font-bold text-primary">{item.recipeQty} {typeof item.recipeQty === "string" && item.recipeQty.toUpperCase().includes('R') ? '' : 'receitas'}</span>
-                              : <span className="text-gray-400 italic">Qtd. não definida</span>
-                            }
-                            <span>• {item.estimatedTime} min</span>
+                            <span className="font-bold text-primary">
+                              {item.quantity}
+                            </span>
+                            <span>{item.unit}</span>
+                            <span>• {item.estimated_time} min</span>
                           </div>
                         </div>
                       </div>
-                      <Badge className={getPriorityColor(item.priority)}>Priority {item.priority}</Badge>
+                      <Badge className={getPriorityColor(item.priority as "A" | "B" | "C")}>
+
+                        Priority {item.priority}
+                      </Badge>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-gray-500">No prep items found matching your criteria.</div>
+                <div className="text-center py-8 text-gray-500">
+                  No prep items found matching your criteria.
+                </div>
               )}
             </CardContent>
           </Card>
@@ -246,3 +223,4 @@ const PrepListDisplay = () => {
 };
 
 export default PrepListDisplay;
+
