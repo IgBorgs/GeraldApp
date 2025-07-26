@@ -22,15 +22,17 @@ import {
   CartesianGrid,
 } from "recharts";
 import { supabase } from "@/lib/supabaseClient";
+import { usePrepList } from "./PrepListContext";
 
 const COLORS = ["#ef4444", "#f59e0b", "#10b981"];
 
 const Charts = () => {
+  const { prepList } = usePrepList();
   const [todayItems, setTodayItems] = useState<any[]>([]);
 
   useEffect(() => {
     fetchPrepListData();
-  }, []);
+  }, [prepList]);
 
   const fetchPrepListData = async () => {
     const today = new Date().toISOString().split("T")[0];

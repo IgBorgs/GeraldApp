@@ -28,7 +28,10 @@ import {
   View,
   StyleSheet,
 } from "@react-pdf/renderer";
-import { usePrepList } from "./PrepListContext"; // ✅ NEW
+import { usePrepList } from "./PrepListContext"; 
+import PrepListPDF from "./PrepListPDF";
+
+
 
 interface DashboardProps {
   userName?: string;
@@ -53,66 +56,23 @@ const styles = StyleSheet.create({
   summary: { marginTop: 20, fontSize: 12 },
 });
 
-const PrepListPDF = ({
-  items,
-  prepStartTime,
-  prepEndTime,
-}: {
-  items: any[];
-  prepStartTime: Date | null;
-  prepEndTime: Date | null;
-}) => (
-  <Document>
-    <Page size="A4" style={styles.page}>
-      <Text style={styles.header}>Gerald Daily Prep List</Text>
-      {prepStartTime && (
-        <Text style={{ fontSize: 12, marginBottom: 4 }}>
-          Prep Started: {prepStartTime.toLocaleTimeString()}
-        </Text>
-      )}
-      {prepEndTime && (
-        <Text style={{ fontSize: 12, marginBottom: 10 }}>
-          Prep Ended: {prepEndTime.toLocaleTimeString()}
-        </Text>
-      )}
-      <View style={styles.tableHeader}>
-        <Text style={styles.cell}>Item</Text>
-        <Text style={styles.cell}>Qty</Text>
-        <Text style={styles.cell}>Unit</Text>
-        <Text style={styles.cell}>Priority</Text>
-        <Text style={styles.cell}>Time</Text>
-        <Text style={styles.cell}>Done</Text>
-      </View>
-      {items.map((item, i) => (
-        <View key={i} style={styles.tableRow}>
-          <Text style={styles.cell}>{item.name}</Text>
-          <Text style={styles.cell}>{item.quantity}</Text>
-          <Text style={styles.cell}>{item.unit}</Text>
-          <Text style={styles.cell}>{item.priority}</Text>
-          <Text style={styles.cell}>{item.estimatedTime || "—"}</Text>
-          <Text style={styles.cell}>{item.completed ? "✓" : "✗"}</Text>
-        </View>
-      ))}
-      <Text style={styles.summary}>Total items: {items.length}</Text>
-      <Text style={styles.summary}>
-        Completed: {items.filter((i) => i.completed).length}
-      </Text>
-      <Text style={styles.summary}>
-        Estimated Time: {items.reduce((acc, i) => acc + (i.estimatedTime || 0), 0)} mins
-      </Text>
-    </Page>
-  </Document>
-);
+
 
 const Dashboard = ({ userName = "Chef" }: DashboardProps) => {
-  const { prepList, isLoading } = usePrepList(); // ✅ NEW
+  const {
+    prepList,
+    isLoading,
+    prepStartTime,
+    prepEndTime,
+    setPrepStartTime,
+    setPrepEndTime,
+  } = usePrepList();
+  
   console.log("📦 prepList from context:", prepList);
 
   const [prepStartedAt, setPrepStartedAt] = useState<Date | null>(null);
   const [elapsedTime, setElapsedTime] = useState("00:00:00");
   const [showDialog, setShowDialog] = useState(false);
-  const [prepStartTime, setPrepStartTime] = useState<Date | null>(null);
-  const [prepEndTime, setPrepEndTime] = useState<Date | null>(null);
   const [summaryData, setSummaryData] = useState({
     totalItemsNeeded: 0,
     priorityA: 0,
@@ -123,7 +83,7 @@ const Dashboard = ({ userName = "Chef" }: DashboardProps) => {
 
   useEffect(() => {
     if (!isLoading && prepList.length > 0) {
-      const neededItems = prepList.filter((i) => i.needed_quantity > 0);
+      const neededItems = prepList;
       setSummaryData({
         totalItemsNeeded: neededItems.length,
         priorityA: neededItems.filter((i) => i.priority === "A").length,
@@ -305,7 +265,8 @@ const Dashboard = ({ userName = "Chef" }: DashboardProps) => {
                 className="w-full"
                 onClick={() => {
                   if (!isLoading) {
-                    const incompleteItems = prepList.filter((item) => item.needed_quantity > 0 && !item.completed);
+                    const incompleteItems = prepList.filter((item) => !item.completed);
+
                     setSummaryData({
                       totalItemsNeeded: incompleteItems.length,
                       priorityA: incompleteItems.filter((i) => i.priority === "A").length,

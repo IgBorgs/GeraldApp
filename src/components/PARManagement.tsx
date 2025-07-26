@@ -22,12 +22,20 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
+  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Search, Plus, Pencil } from "lucide-react";
+import { Search, Plus, Pencil, Trash } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface IngredientPAR {
   id: string;
@@ -43,8 +51,10 @@ interface IngredientPAR {
   needsFryer: boolean;
 }
 
+
 const PARManagement = () => {
   const [ingredients, setIngredients] = useState<IngredientPAR[]>([]);
+  const [ingredientToDelete, setIngredientToDelete] = useState<IngredientPAR | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editedIngredient, setEditedIngredient] = useState<Partial<IngredientPAR>>({});
@@ -164,6 +174,37 @@ const PARManagement = () => {
     }
   };
 
+  const handleDeleteIngredient = async (id: string) => {
+    console.log("🔁 Trying to delete stock entries for:", id);
+  
+    const { error: stockError } = await supabase
+      .from("stock")
+      .delete()
+      .eq("item_id", id);
+  
+    if (stockError) {
+      console.error("❌ Failed to delete from stock:", stockError.message);
+      return;
+    }
+  
+    console.log("🧹 Stock entries deleted. Deleting ingredient...");
+  
+    const { error: itemError } = await supabase
+      .from("items")
+      .delete()
+      .eq("id", id);
+  
+    if (itemError) {
+      console.error("❌ Failed to delete from items:", itemError.message);
+    } else {
+      console.log("✅ Ingredient deleted successfully");
+      fetchIngredients();
+    }
+  };
+  
+  
+  
+
   const filteredIngredients = ingredients.filter((ingredient) =>
     ingredient.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -197,49 +238,114 @@ const PARManagement = () => {
                   <AlertDialogTitle>Add New Ingredient</AlertDialogTitle>
                 </AlertDialogHeader>
                 <div className="grid grid-cols-4 gap-4 py-4">
-                  {[
-                    { label: "Name", field: "name", type: "text" },
-                    { label: "Category", field: "category", type: "text" },
-                    { label: "PAR Level", field: "parLevel", type: "number" },
-                    { label: "Unit", field: "unit", type: "text" },
-                    { label: "Notes", field: "notes", type: "text" },
-                    { label: "Estimated Time", field: "estimated_time", type: "number" },
-                    { label: "Menu Relevance", field: "menu_relevance", type: "checkbox" },
-                    { label: "Qty to Prep (Recipe)", field: "default_recipe_qty", type: "text" },
-                    { label: "Lunch Item", field: "isLunchItem", type: "checkbox" },
-                    { label: "Needs Fryer", field: "needsFryer", type: "checkbox" },
-                  ].map(({ label, field, type }) => (
-                    <div key={field} className="col-span-4 sm:col-span-2 flex items-center gap-2">
+                {[
+                  { label: "Name", field: "name", type: "text" },
+                  { label: "Category", field: "category", type: "text" },
+                  { label: "PAR Level", field: "parLevel", type: "number" },
+                  { label: "Unit", field: "unit", type: "text" },
+                  { label: "Notes", field: "notes", type: "text" },
+                  { label: "Estimated Time", field: "estimated_time", type: "number" },
+                  { label: "Menu Relevance", field: "menu_relevance", type: "checkbox" },
+                  { label: "Qty to Prep (Recipe)", field: "default_recipe_qty", type: "text" },
+                  { label: "Lunch Item", field: "isLunchItem", type: "checkbox" },
+                  { label: "Needs Fryer", field: "needsFryer", type: "checkbox" },
+                ].map(({ label, field, type }) => {
+                  const isEdit = !!editingId;
+                  const state = isEdit ? editedIngredient : newIngredient;
+                  const setState = isEdit ? setEditedIngredient : setNewIngredient;
+
+                  return (
+                    <div
+                      key={field}
+                      className="col-span-4 sm:col-span-2 flex items-center gap-2"
+                    >
                       <label className="text-sm font-medium w-40">{label}</label>
+
                       {type === "checkbox" ? (
                         <Input
                           type="checkbox"
-                          checked={!!newIngredient[field]}
+                          checked={!!state[field]}
                           onChange={(e) =>
-                            setNewIngredient({
-                              ...newIngredient,
+                            setState({
+                              ...state,
                               [field]: e.target.checked,
                             })
                           }
                           className="h-4 w-4"
                         />
+                      ) : field === "category" ? (
+                        <Select
+                          value={state.category || ""}
+                          onValueChange={(value) =>
+                            setState({
+                              ...state,
+                              category: value,
+                            })
+                          }
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select a category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[
+                              "Protein",
+                              "Dry Goods",
+                              "Sauces",
+                              "Vegetables",
+                              "Spices",
+                              "Produce",
+                              "Butter",
+                              "Dairy",
+                              "Desserts",
+                              "Others",
+                            ].map((option) => (
+                              <SelectItem key={option} value={option}>
+                                {option}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : field === "unit" ? (
+                        <Select
+                          value={state.unit || ""}
+                          onValueChange={(value) =>
+                            setState({
+                              ...state,
+                              unit: value,
+                            })
+                          }
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select a unit" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {["lbs", "ea", "L", "bin(s)"].map((unit) => (
+                              <SelectItem key={unit} value={unit}>
+                                {unit}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       ) : (
                         <Input
                           type={type}
-                          value={newIngredient[field]?.toString() || ""}
+                          value={state[field]?.toString() || ""}
                           onChange={(e) =>
-                            setNewIngredient({
-                              ...newIngredient,
-                              [field]: type === "number"
-                                ? parseInt(e.target.value)
-                                : e.target.value,
+                            setState({
+                              ...state,
+                              [field]:
+                                type === "number"
+                                  ? parseInt(e.target.value)
+                                  : e.target.value,
                             })
                           }
                           className="w-full"
                         />
                       )}
                     </div>
-                  ))}
+                  );
+                })}
+
                 </div>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -271,13 +377,20 @@ const PARManagement = () => {
                     <TableCell>{ing.parLevel}</TableCell>
                     <TableCell>{ing.unit}</TableCell>
                     <TableCell>{ing.default_recipe_qty}</TableCell>
-                    <TableCell>
+                    <TableCell className="flex gap-3">
                       <Button
                         size="icon"
                         variant="outline"
                         onClick={() => openEditDialog(ing)}
                       >
                         <Pencil size={16} />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="destructive"
+                        onClick={() => setIngredientToDelete(ing)}
+                      >
+                        <Trash size={16} />
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -292,39 +405,101 @@ const PARManagement = () => {
                 <AlertDialogTitle>Edit Ingredient</AlertDialogTitle>
               </AlertDialogHeader>
               <div className="grid grid-cols-4 gap-4 py-4">
-                {[
-                  { label: "Name", field: "name", type: "text" },
-                  { label: "Category", field: "category", type: "text" },
-                  { label: "PAR Level", field: "parLevel", type: "number" },
-                  { label: "Unit", field: "unit", type: "text" },
-                  { label: "Notes", field: "notes", type: "text" },
-                  { label: "Estimated Time", field: "estimated_time", type: "number" },
-                  { label: "Menu Relevance", field: "menu_relevance", type: "checkbox" },
-                  { label: "Qty to Prep (Recipe)", field: "default_recipe_qty", type: "text" },
-                  { label: "Lunch Item", field: "isLunchItem", type: "checkbox" },
-                  { label: "Needs Fryer", field: "needsFryer", type: "checkbox" },
-                ].map(({ label, field, type }) => (
-                  <div key={field} className="col-span-4 sm:col-span-2 flex items-center gap-2">
+              {[
+                { label: "Name", field: "name", type: "text" },
+                { label: "Category", field: "category", type: "text" },
+                { label: "PAR Level", field: "parLevel", type: "number" },
+                { label: "Unit", field: "unit", type: "text" },
+                { label: "Notes", field: "notes", type: "text" },
+                { label: "Estimated Time", field: "estimated_time", type: "number" },
+                { label: "Menu Relevance", field: "menu_relevance", type: "checkbox" },
+                { label: "Qty to Prep (Recipe)", field: "default_recipe_qty", type: "text" },
+                { label: "Lunch Item", field: "isLunchItem", type: "checkbox" },
+                { label: "Needs Fryer", field: "needsFryer", type: "checkbox" },
+              ].map(({ label, field, type }) => {
+                const isEdit = !!editingId;
+                const state = isEdit ? editedIngredient : newIngredient;
+                const setState = isEdit ? setEditedIngredient : setNewIngredient;
+
+                return (
+                  <div
+                    key={field}
+                    className="col-span-4 sm:col-span-2 flex items-center gap-2"
+                  >
                     <label className="text-sm font-medium w-40">{label}</label>
+
                     {type === "checkbox" ? (
                       <Input
                         type="checkbox"
-                        checked={!!editedIngredient[field]}
+                        checked={!!state[field]}
                         onChange={(e) =>
-                          setEditedIngredient({
-                            ...editedIngredient,
+                          setState({
+                            ...state,
                             [field]: e.target.checked,
                           })
                         }
                         className="h-4 w-4"
                       />
+                    ) : field === "category" ? (
+                      <Select
+                        value={state.category || ""}
+                        onValueChange={(value) =>
+                          setState({
+                            ...state,
+                            category: value,
+                          })
+                        }
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select a category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[
+                            "Protein",
+                            "Dry Goods",
+                            "Sauces",
+                            "Vegetables",
+                            "Spices",
+                            "Produce",
+                            "Butter",
+                            "Dairy",
+                            "Desserts",
+                            "Others",
+                          ].map((option) => (
+                            <SelectItem key={option} value={option}>
+                              {option}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : field === "unit" ? (
+                      <Select
+                        value={state.unit || ""}
+                        onValueChange={(value) =>
+                          setState({
+                            ...state,
+                            unit: value,
+                          })
+                        }
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select a unit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {["lbs", "ea", "L", "bin(s)"].map((unit) => (
+                            <SelectItem key={unit} value={unit}>
+                              {unit}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     ) : (
                       <Input
                         type={type}
-                        value={editedIngredient[field]?.toString() || ""}
+                        value={state[field]?.toString() || ""}
                         onChange={(e) =>
-                          setEditedIngredient({
-                            ...editedIngredient,
+                          setState({
+                            ...state,
                             [field]:
                               type === "number"
                                 ? parseInt(e.target.value)
@@ -335,7 +510,9 @@ const PARManagement = () => {
                       />
                     )}
                   </div>
-                ))}
+                );
+              })}
+
               </div>
               <AlertDialogFooter>
                 <AlertDialogCancel
@@ -352,6 +529,37 @@ const PARManagement = () => {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+
+          <AlertDialog open={!!ingredientToDelete} onOpenChange={() => setIngredientToDelete(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Ingredient</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete{" "}
+                  <strong>{ingredientToDelete?.name}</strong>? This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setIngredientToDelete(null)}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-red-600 hover:bg-red-700"
+                  onClick={() => {
+                    if (ingredientToDelete?.id) {
+                      console.log("🧪 Calling handleDeleteIngredient for:", ingredientToDelete.id);
+                      handleDeleteIngredient(ingredientToDelete.id);
+                    } else {
+                      console.warn("⚠️ No ingredient ID to delete");
+                    }
+                    setIngredientToDelete(null);
+                  }}
+                >
+                  Delete
+                </AlertDialogAction>
+
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
+
         </CardContent>
       </Card>
     </div>

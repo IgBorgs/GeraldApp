@@ -26,6 +26,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { supabase } from "@/lib/supabaseClient";
+import { usePrepList } from "@/components/PrepListContext";
+
 
 interface InventoryItem {
   id: string;
@@ -43,6 +45,8 @@ const InventoryForm = ({ onSave = () => {} }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState(false);
+
+  const { refreshPrepList } = usePrepList();
 
   useEffect(() => {
     const fetchInventory = async () => {
@@ -116,6 +120,7 @@ const InventoryForm = ({ onSave = () => {} }) => {
     } else {
       console.log("✅ Stock saved successfully:", data);
       setSaveSuccess(true);
+      await refreshPrepList(true);
     }
 
     setIsSaving(false);
@@ -148,6 +153,7 @@ const InventoryForm = ({ onSave = () => {} }) => {
   });
 
   return (
+    <div className="p-6 w-full"> 
     <Card className="w-full bg-background">
       <CardHeader>
         <CardTitle className="text-2xl font-bold ">Current Inventory</CardTitle>
@@ -180,16 +186,25 @@ const InventoryForm = ({ onSave = () => {} }) => {
           <Button
             variant="outline"
             size="icon"
-            onClick={() => {
-              setSearchTerm("");
-              setSelectedCategory("all");
-            }}
+            onClick={handleSave}
+            disabled={isSaving}
+            className="relative"
+            title="Save Inventory"
           >
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw
+              className={`h-4 w-4 transition-transform duration-500 ${
+                isSaving ? "animate-spin" : ""
+              }`}
+            />
           </Button>
         </div>
       </CardHeader>
       <CardContent>
+        
+        <div className="text-sm text-muted-foreground mb-2">
+          Showing <strong>{filteredInventory.length}</strong> ingredient{filteredInventory.length === 1 ? "" : "s"} in the system.
+        </div>
+
         <div className="rounded-md border">
           <Table>
             <TableHeader>
@@ -252,8 +267,9 @@ const InventoryForm = ({ onSave = () => {} }) => {
               : "Save Inventory"}
           </Button>
         </div>
-      </CardContent>
+      </CardContent> 
     </Card>
+  </div>
   );
 };
 
