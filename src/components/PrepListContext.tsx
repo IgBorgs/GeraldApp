@@ -112,11 +112,13 @@ export const PrepListProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
 
     if (!forceRefresh && existingPrepList && existingPrepList.length > 0) {
-      console.log("📦 Using existing prep_list from Supabase");
-      setPrepList(existingPrepList);
+      console.log("📦 Using existing prep_list from Supabase (filtered for incomplete items)");
+      const incompleteOnly = existingPrepList.filter((item) => !item.completed);
+      setPrepList(incompleteOnly);
       setIsLoading(false);
       return;
     }
+    
 
     // ✅ Delete existing prep_list for today if regenerating
     if (forceRefresh && existingPrepList && existingPrepList.length > 0) {

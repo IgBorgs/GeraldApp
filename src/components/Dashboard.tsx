@@ -30,6 +30,9 @@ import {
 } from "@react-pdf/renderer";
 import { usePrepList } from "./PrepListContext"; 
 import PrepListPDF from "./PrepListPDF";
+import { Pen, Trash2 } from "lucide-react";
+
+
 
 
 
@@ -70,6 +73,7 @@ const Dashboard = ({ userName = "Chef" }: DashboardProps) => {
   
   console.log("📦 prepList from context:", prepList);
 
+  
   const [prepStartedAt, setPrepStartedAt] = useState<Date | null>(null);
   const [elapsedTime, setElapsedTime] = useState("00:00:00");
   const [showDialog, setShowDialog] = useState(false);
@@ -80,6 +84,17 @@ const Dashboard = ({ userName = "Chef" }: DashboardProps) => {
     priorityC: 0,
     lastUpdated: "",
   });
+
+  const [notes, setNotes] = useState<string[]>(() => {
+    const today = new Date().toISOString().split("T")[0];
+    const stored = localStorage.getItem(`kitchen_notes_${today}`);
+    return stored ? JSON.parse(stored) : [];
+  });
+  
+  const [newNote, setNewNote] = useState("");
+  
+
+
 
   useEffect(() => {
     if (!isLoading && prepList.length > 0) {
@@ -110,6 +125,14 @@ const Dashboard = ({ userName = "Chef" }: DashboardProps) => {
     }
     return () => clearInterval(timer);
   }, [prepStartedAt]);
+
+
+  useEffect(() => {
+    const today = new Date().toISOString().split("T")[0];
+    localStorage.setItem(`kitchen_notes_${today}`, JSON.stringify(notes));
+  }, [notes]);
+  
+
 
   const handleGeneratePDF = async () => {
     const today = new Date().toISOString().split("T")[0];
@@ -215,74 +238,100 @@ const Dashboard = ({ userName = "Chef" }: DashboardProps) => {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="md:col-span-2">
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Button
-                onClick={() => (window.location.href = "/inventory")}
-                className="h-24 flex flex-col items-center justify-center gap-2"
-              >
-                <Clipboard className="h-6 w-6" />
-                Input Today's Inventory
-              </Button>
-              <Button
-                onClick={() => (window.location.href = "/preplist")}
-                className="h-24 flex flex-col items-center justify-center gap-2"
-                variant="secondary"
-              >
-                <ChefHat className="h-6 w-6" />
-                View Prep Lists
-              </Button>
-              <Button
-                onClick={handleGeneratePDF}
-                className="h-24 flex flex-col items-center justify-center gap-2"
-                variant="outline"
-              >
-                <Clipboard className="h-6 w-6" />
-                Prep List Document
-              </Button>
-            </CardContent>
-          </Card>
+        {/* Quick Actions as full width row */}
+          <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Quick Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Button
+                  onClick={() => (window.location.href = "/inventory")}
+                  className="h-24 flex flex-col items-center justify-center gap-2"
+                >
+                  <Clipboard className="h-6 w-6" />
+                  Input Today's Inventory
+                </Button>
+                <Button
+                  onClick={() => (window.location.href = "/prep")}
+                  className="h-24 flex flex-col items-center justify-center gap-2"
+                  variant="secondary"
+                >
+                  <ChefHat className="h-6 w-6" />
+                  View Prep List
+                </Button>
+                <Button
+                  onClick={handleGeneratePDF}
+                  className="h-24 flex flex-col items-center justify-center gap-2"
+                  variant="outline"
+                >
+                  <Clipboard className="h-6 w-6" />
+                  Prep List Document
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Status</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-amber-500" />
-                <span className="text-sm">Live data from app state</span>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Last updated: {summaryData.lastUpdated}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={() => {
-                  if (!isLoading) {
-                    const incompleteItems = prepList.filter((item) => !item.completed);
+          {/* Kitchen Notes separate card underneath */}
+          <div className="grid grid-cols-1 mt-6">
+            <Card>
+              <CardHeader>
+              <CardTitle className="text-xl font-semibold flex items-center gap-2">
+                <Pen className="h-5 w-5" />
+                Kitchen Notes
+              </CardTitle>
 
-                    setSummaryData({
-                      totalItemsNeeded: incompleteItems.length,
-                      priorityA: incompleteItems.filter((i) => i.priority === "A").length,
-                      priorityB: incompleteItems.filter((i) => i.priority === "B").length,
-                      priorityC: incompleteItems.filter((i) => i.priority === "C").length,
-                      lastUpdated: new Date().toLocaleString(),
-                    });
+                <CardDescription>
+                  Write down any prep notes, special instructions, or reminders for today.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newNote}
+                    onChange={(e) => setNewNote(e.target.value)}
+                    placeholder="Write a note and press Add..."
+                    className="flex-1 border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                  <Button
+                    onClick={() => {
+                      if (newNote.trim()) {
+                        setNotes((prev) => [...prev, newNote.trim()]);
+                        setNewNote("");
+                      }
+                    }}
+                    className="bg-green-600 text-white hover:bg-green-700"
+                  >
+                    Add
+                  </Button>
+                </div>
 
-                  }
-                }}
-              >
-                Refresh Data
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+      <div className="grid gap-3">
+        {notes.map((note, idx) => (
+          <div
+            key={idx}
+            className="p-3 rounded-md bg-muted text-sm text-muted-foreground flex justify-between items-start border"
+          >
+            <span className="text-primary">{note}</span>
+            <button
+              onClick={() => setNotes((prev) => prev.filter((_, i) => i !== idx))}
+              className="ml-4 text-red-500 hover:text-red-700"
+              title="Delete note"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+
+          </div>
+        ))}
+        {notes.length === 0 && (
+          <p className="text-muted-foreground text-sm">No notes yet.</p>
+        )}
+      </div>
+    </CardContent>
+  </Card>
+</div>
+
       </div>
     </div>
   );

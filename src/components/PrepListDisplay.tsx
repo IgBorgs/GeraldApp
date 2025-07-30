@@ -160,8 +160,18 @@ const PrepListDisplay = () => {
 
               {/* Right: Buttons */}
               <div className="flex flex-col items-end gap-2">
-                <Button
-                  onClick={saveCompletedPrepItems}
+              <Button
+                  onClick={async () => {
+                    setSaveStatus("saving");
+                    try {
+                      await saveCompletedPrepItems();
+                      setSaveStatus("success");
+                      setTimeout(() => setSaveStatus("idle"), 4000);
+                    } catch (err) {
+                      console.error("Error saving completed prep items:", err);
+                      setSaveStatus("idle"); // optional: you could show an error status instead
+                    }
+                  }}
                   className="bg-green-600 text-white hover:bg-green-700"
                 >
                   {saveStatus === "saving"
@@ -170,6 +180,7 @@ const PrepListDisplay = () => {
                     ? "Saved Successfully!"
                     : "Save Completed Prep Items"}
                 </Button>
+
                 <Button
                   onClick={handleExportPDF}
                   variant="outline"
