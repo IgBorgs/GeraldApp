@@ -27,7 +27,8 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/lib/supabaseClient";
 import { usePrepList } from "@/components/PrepListContext";
-
+import BackToHomeButton from "./BackToHomeButton"; // ✅ Floating Back button
+import { useLocation } from "react-router-dom";
 
 interface InventoryItem {
   id: string;
@@ -47,6 +48,8 @@ const InventoryForm = ({ onSave = () => {} }) => {
   const [saveError, setSaveError] = useState(false);
 
   const { refreshPrepList } = usePrepList();
+  const location = useLocation();
+  const isFullPage = location.pathname === "/inventory";
 
   useEffect(() => {
     const fetchInventory = async () => {
@@ -153,125 +156,128 @@ const InventoryForm = ({ onSave = () => {} }) => {
   });
 
   return (
-    <div className="p-6 w-full"> 
-    <Card className="w-full bg-background">
-      <CardHeader>
-        <CardTitle className="text-2xl font-bold ">Current Inventory</CardTitle>
-        <CardDescription>
-          Enter the current stock levels for each ingredient. The system will
-          automatically calculate what needs to be prepped.
-        </CardDescription>
-        <div className="flex flex-col gap-4 mt-4 md:flex-row md:items-center">
-          <div className="relative flex-1">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search ingredients..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-8"
-            />
-          </div>
-          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger className="w-full md:w-[180px]">
-              <SelectValue placeholder="Category" />
-            </SelectTrigger>
-            <SelectContent>
-              {categories.map((category) => (
-                <SelectItem key={category} value={category}>
-                  {category.charAt(0).toUpperCase() + category.slice(1)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleSave}
-            disabled={isSaving}
-            className="relative"
-            title="Save Inventory"
-          >
-            <RefreshCw
-              className={`h-4 w-4 transition-transform duration-500 ${
-                isSaving ? "animate-spin" : ""
-              }`}
-            />
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent>
-        
-        <div className="text-sm text-muted-foreground mb-2">
-          Showing <strong>{filteredInventory.length}</strong> ingredient{filteredInventory.length === 1 ? "" : "s"} in the system.
-        </div>
+    <div className="p-6 w-full">
+      <BackToHomeButton />
+      <div className={isFullPage ? "pt-16" : ""}>
+        <Card className="w-full bg-background">
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold">Current Inventory</CardTitle>
+            <CardDescription>
+              Enter the current stock levels for each ingredient. The system will
+              automatically calculate what needs to be prepped.
+            </CardDescription>
+            <div className="flex flex-col gap-4 mt-4 md:flex-row md:items-center">
+              <div className="relative flex-1">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search ingredients..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger className="w-full md:w-[180px]">
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((category) => (
+                    <SelectItem key={category} value={category}>
+                      {category.charAt(0).toUpperCase() + category.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleSave}
+                disabled={isSaving}
+                className="relative"
+                title="Save Inventory"
+              >
+                <RefreshCw
+                  className={`h-4 w-4 transition-transform duration-500 ${
+                    isSaving ? "animate-spin" : ""
+                  }`}
+                />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-sm text-muted-foreground mb-2">
+              Showing <strong>{filteredInventory.length}</strong> ingredient{filteredInventory.length === 1 ? "" : "s"} in the system.
+            </div>
 
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[300px]">Ingredient</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Current Stock</TableHead>
-                <TableHead>PAR Level</TableHead>
-                <TableHead>Unit</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Needed</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredInventory.length > 0 ? (
-                filteredInventory.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium">{item.name}</TableCell>
-                    <TableCell>{item.category}</TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        value={item.currentStock}
-                        onChange={(e) =>
-                          handleStockChange(item.id, e.target.value)
-                        }
-                        className="w-20"
-                        min="0"
-                      />
-                    </TableCell>
-                    <TableCell>{item.parLevel}</TableCell>
-                    <TableCell>{item.unit}</TableCell>
-                    <TableCell>
-                      {getStatusBadge(item.currentStock, item.parLevel)}
-                    </TableCell>
-                    <TableCell>
-                      {Math.max(0, item.parLevel - item.currentStock)} {item.unit}
-                    </TableCell>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[300px]">Ingredient</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Current Stock</TableHead>
+                    <TableHead>PAR Level</TableHead>
+                    <TableHead>Unit</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Needed</TableHead>
                   </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-4">
-                    No ingredients found matching your search.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-        <div className="flex justify-end mt-6">
-          <Button onClick={handleSave} className="flex items-center gap-2" disabled={isSaving}>
-            <Save className="h-4 w-4" />
-            {isSaving
-              ? "Saving..."
-              : saveSuccess
-              ? "Saved ✔️"
-              : saveError
-              ? "Error ❌"
-              : "Save Inventory"}
-          </Button>
-        </div>
-      </CardContent> 
-    </Card>
-  </div>
+                </TableHeader>
+                <TableBody>
+                  {filteredInventory.length > 0 ? (
+                    filteredInventory.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-medium">{item.name}</TableCell>
+                        <TableCell>{item.category}</TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={item.currentStock}
+                            onChange={(e) =>
+                              handleStockChange(item.id, e.target.value)
+                            }
+                            className="w-20"
+                            min="0"
+                          />
+                        </TableCell>
+                        <TableCell>{item.parLevel}</TableCell>
+                        <TableCell>{item.unit}</TableCell>
+                        <TableCell>
+                          {getStatusBadge(item.currentStock, item.parLevel)}
+                        </TableCell>
+                        <TableCell>
+                          {Math.max(0, item.parLevel - item.currentStock)} {item.unit}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-4">
+                        No ingredients found matching your search.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="flex justify-end mt-6">
+              <Button onClick={handleSave} className="flex items-center gap-2" disabled={isSaving}>
+                <Save className="h-4 w-4" />
+                {isSaving
+                  ? "Saving..."
+                  : saveSuccess
+                  ? "Saved ✔️"
+                  : saveError
+                  ? "Error ❌"
+                  : "Save Inventory"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
 };
 
 export default InventoryForm;
+
 

@@ -31,6 +31,7 @@ import {
 import { usePrepList } from "./PrepListContext"; 
 import PrepListPDF from "./PrepListPDF";
 import { Pen, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 
 
@@ -92,6 +93,7 @@ const Dashboard = ({ userName = "Chef" }: DashboardProps) => {
   });
   
   const [newNote, setNewNote] = useState("");
+  const navigate = useNavigate();
   
 
 
@@ -245,21 +247,23 @@ const Dashboard = ({ userName = "Chef" }: DashboardProps) => {
                 <CardTitle>Quick Actions</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Button
-                  onClick={() => (window.location.href = "/inventory")}
+              <Button
+                  onClick={() => navigate("/inventory")}
                   className="h-24 flex flex-col items-center justify-center gap-2"
                 >
                   <Clipboard className="h-6 w-6" />
                   Input Today's Inventory
                 </Button>
+
                 <Button
-                  onClick={() => (window.location.href = "/prep")}
+                  onClick={() => navigate("/prep")}
                   className="h-24 flex flex-col items-center justify-center gap-2"
                   variant="secondary"
                 >
                   <ChefHat className="h-6 w-6" />
                   View Prep List
-                </Button>
+              </Button>
+
                 <Button
                   onClick={handleGeneratePDF}
                   className="h-24 flex flex-col items-center justify-center gap-2"
