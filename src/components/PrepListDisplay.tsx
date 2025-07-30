@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { usePrepList } from "@/components/PrepListContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,18 +16,10 @@ import { Search, Filter, ChevronDown, Clipboard } from "lucide-react";
 import { getPriorityColor } from "@/lib/priority";
 import PrepListPDF from "./PrepListPDF";
 import { pdf } from "@react-pdf/renderer";
+import { PrepItem } from "@/components/PrepListContext";
 
-interface PrepItem {
-  id?: string;
-  item_id: string;
-  name: string;
-  unit: string;
-  priority: "A" | "B" | "C";
-  completed: boolean;
-  estimated_time: number;
-  quantity: number;
-  needed_quantity: number;
-}
+
+
 
 const PrepListDisplay = () => {
   const {
@@ -39,18 +31,11 @@ const PrepListDisplay = () => {
     prepEndTime,
     saveCompletedPrepItems,
   } = usePrepList();
-  
 
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("priority");
   const [activeTab, setActiveTab] = useState("all");
-
- 
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "success">("idle");
-
-  
-
-  
 
   if (isLoading) return <div className="p-6 text-gray-500">Loading prep list...</div>;
   if (error) return <div className="p-6 text-red-500">Error: {error}</div>;
@@ -95,7 +80,6 @@ const PrepListDisplay = () => {
       />
     ).toBlob();
 
-
     const blobUrl = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = blobUrl;
@@ -103,9 +87,20 @@ const PrepListDisplay = () => {
     link.click();
   };
 
+  const renderQuantityDisplay = (item: PrepItem) => {
+    const recipes = item.quantity;
+    const yieldPerRecipe = item.recipe_yield || 1;
+    const totalQty = recipes * yieldPerRecipe;
+
+    return (
+      <span className="font-bold text-primary">
+        {recipes}R ({totalQty} {item.unit})
+      </span>
+    );
+  };
+
   return (
     <div className="bg-background p-6 rounded-lg shadow-sm w-full">
-
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
         <div>
           <h2 className="text-2xl font-bold text-gray-800">Prep List</h2>
@@ -139,64 +134,6 @@ const PrepListDisplay = () => {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </div>
-
-      <div className="mb-6">
-      <Card>
-          <CardHeader className="pb-4">
-            <div className="w-full flex justify-between items-start">
-              {/* Left: Title + Summary text together */}
-              <div className="space-y-1">
-                <CardTitle className="text-base">Daily Summary</CardTitle>
-                <div className="text-sm text-gray-600">
-                  <div>Total Items: {report.totalItems}</div>
-                  <div>Completed Items: {report.completedItems}</div>
-                  <div>
-                    Estimated Total Time: {report.totalTime} min (
-                    {Math.floor(report.totalTime / 60)}h {report.totalTime % 60}min)
-                  </div>
-                </div>
-              </div>
-
-              {/* Right: Buttons */}
-              <div className="flex flex-col items-end gap-2">
-              <Button
-                  onClick={async () => {
-                    setSaveStatus("saving");
-                    try {
-                      await saveCompletedPrepItems();
-                      setSaveStatus("success");
-                      setTimeout(() => setSaveStatus("idle"), 4000);
-                    } catch (err) {
-                      console.error("Error saving completed prep items:", err);
-                      setSaveStatus("idle"); // optional: you could show an error status instead
-                    }
-                  }}
-                  className="bg-green-600 text-white hover:bg-green-700"
-                >
-                  {saveStatus === "saving"
-                    ? "Saving..."
-                    : saveStatus === "success"
-                    ? "Saved Successfully!"
-                    : "Save Completed Prep Items"}
-                </Button>
-
-                <Button
-                  onClick={handleExportPDF}
-                  variant="outline"
-                  className="flex items-center gap-2"
-                  title="Export as PDF"
-                >
-                  <Clipboard className="h-4 w-4" />
-                  Export as PDF
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-
-
-
-      </Card>
       </div>
 
       <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -241,20 +178,12 @@ const PrepListDisplay = () => {
                             {item.name}
                           </label>
                           <div className="text-sm text-gray-500 flex items-center gap-2">
-                          <span className="font-bold text-primary">
-                            {item.quantity} {item.unit}
-                          </span>
-                          <span className="text-xs text-muted-foreground ml-1">
-                            ({item.needed_quantity} × recipe qty)
-                          </span>
-
-                            <span>{item.unit}</span>
+                            {renderQuantityDisplay(item)}
                             <span>• {item.estimated_time} min</span>
                           </div>
                         </div>
                       </div>
                       <Badge className={getPriorityColor(item.priority as "A" | "B" | "C")}>
-
                         Priority {item.priority}
                       </Badge>
                     </div>
@@ -274,5 +203,6 @@ const PrepListDisplay = () => {
 };
 
 export default PrepListDisplay;
+
 
 
