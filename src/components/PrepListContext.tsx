@@ -176,7 +176,7 @@ export const PrepListProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (generatedList.length > 0) {
       const { error: insertError } = await supabase
         .from("prep_list")
-        .insert(generatedList, { onConflict: ["date", "item_id"] });
+        .upsert(generatedList, { onConflict: ["date", "item_id"] });
 
       if (insertError) {
         console.error("❌ Error inserting new prep list:", insertError.message);
