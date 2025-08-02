@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { usePrepList } from "@/components/PrepListContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,21 +16,9 @@ import { Search, Filter, ChevronDown, Clipboard } from "lucide-react";
 import { getPriorityColor } from "@/lib/priority";
 import PrepListPDF from "./PrepListPDF";
 import { pdf } from "@react-pdf/renderer";
+import { PrepItem } from "@/components/PrepListContext";
 import BackToHomeButton from "./BackToHomeButton";
 import { useLocation } from "react-router-dom";
-
-
-interface PrepItem {
-  id?: string;
-  item_id: string;
-  name: string;
-  unit: string;
-  priority: "A" | "B" | "C";
-  completed: boolean;
-  estimated_time: number;
-  quantity: number;
-  needed_quantity: number;
-}
 
 const PrepListDisplay = () => {
   const {
@@ -45,7 +33,6 @@ const PrepListDisplay = () => {
 
   const location = useLocation();
   const isFullPage = location.pathname === "/prep";
-
 
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("priority");
@@ -79,7 +66,6 @@ const PrepListDisplay = () => {
 
   const handleExportPDF = async () => {
     const today = new Date().toISOString().split("T")[0];
-
     const blob = await pdf(
       <PrepListPDF
         items={sortedItems.map((item) => ({
@@ -100,6 +86,18 @@ const PrepListDisplay = () => {
     link.href = blobUrl;
     link.download = `PrepList-${today}.pdf`;
     link.click();
+  };
+
+  const renderQuantityDisplay = (item: PrepItem) => {
+    const recipes = item.quantity;
+    const yieldPerRecipe = item.recipe_yield || 1;
+    const totalQty = recipes * yieldPerRecipe;
+
+    return (
+      <span className="font-bold text-primary">
+        {recipes}R ({totalQty} {item.unit})
+      </span>
+    );
   };
 
   return (
@@ -235,18 +233,12 @@ const PrepListDisplay = () => {
                               {item.name}
                             </label>
                             <div className="text-sm text-gray-500 flex items-center gap-2">
-                              <span className="font-bold text-primary">
-                                {item.quantity} {item.unit}
-                              </span>
-                              <span className="text-xs text-muted-foreground ml-1">
-                                ({item.needed_quantity} × recipe qty)
-                              </span>
-                              <span>{item.unit}</span>
+                              {renderQuantityDisplay(item)}
                               <span>• {item.estimated_time} min</span>
                             </div>
                           </div>
                         </div>
-                        <Badge className={getPriorityColor(item.priority)}>
+                        <Badge className={getPriorityColor(item.priority as "A" | "B" | "C")}>
                           Priority {item.priority}
                         </Badge>
                       </div>
@@ -268,6 +260,7 @@ const PrepListDisplay = () => {
 };
 
 export default PrepListDisplay;
+
 
 
 

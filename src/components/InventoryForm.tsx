@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/lib/supabaseClient";
 import { usePrepList } from "@/components/PrepListContext";
-import BackToHomeButton from "./BackToHomeButton"; // ✅ Floating Back button
+import BackToHomeButton from "./BackToHomeButton";
 import { useLocation } from "react-router-dom";
 
 interface InventoryItem {
@@ -98,8 +98,8 @@ const InventoryForm = ({ onSave = () => {} }) => {
     const numValue = value === "" ? 0 : Number(value);
     setInventory(
       inventory.map((item) =>
-        item.id === id ? { ...item, currentStock: numValue } : item,
-      ),
+        item.id === id ? { ...item, currentStock: numValue } : item
+      )
     );
   };
 
@@ -108,14 +108,16 @@ const InventoryForm = ({ onSave = () => {} }) => {
     setSaveSuccess(false);
     setSaveError(false);
 
-    const formattedStock = inventory.map(item => ({
+    const formattedStock = inventory.map((item) => ({
       item_id: item.id,
       quantity: item.currentStock,
     }));
 
-    const { data, error } = await supabase.from("stock").upsert(formattedStock, {
-      onConflict: ["item_id"],
-    });
+    const { data, error } = await supabase
+      .from("stock")
+      .upsert(formattedStock, {
+        onConflict: ["item_id"],
+      });
 
     if (error) {
       console.error("❌ Error saving stock to Supabase:", error.message);
@@ -135,15 +137,10 @@ const InventoryForm = ({ onSave = () => {} }) => {
 
   const getStatusBadge = (current: number, par: number) => {
     const ratio = current / par;
-    if (ratio <= 0.25) {
-      return <Badge variant="destructive">Critical</Badge>;
-    } else if (ratio <= 0.5) {
-      return <Badge variant="default">Low</Badge>;
-    } else if (ratio < 1) {
-      return <Badge variant="secondary">Moderate</Badge>;
-    } else {
-      return <Badge variant="outline">Good</Badge>;
-    }
+    if (ratio <= 0.25) return <Badge variant="destructive">Critical</Badge>;
+    if (ratio <= 0.5) return <Badge variant="default">Low</Badge>;
+    if (ratio < 1) return <Badge variant="secondary">Moderate</Badge>;
+    return <Badge variant="outline">Good</Badge>;
   };
 
   const filteredInventory = inventory.filter((item) => {
@@ -164,7 +161,7 @@ const InventoryForm = ({ onSave = () => {} }) => {
             <CardTitle className="text-2xl font-bold">Current Inventory</CardTitle>
             <CardDescription>
               Enter the current stock levels for each ingredient. The system will
-              automatically calculate what needs to be prepped.
+              automatically generate the prep list for items below PAR.
             </CardDescription>
             <div className="flex flex-col gap-4 mt-4 md:flex-row md:items-center">
               <div className="relative flex-1">
@@ -176,7 +173,10 @@ const InventoryForm = ({ onSave = () => {} }) => {
                   className="pl-8"
                 />
               </div>
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <Select
+                value={selectedCategory}
+                onValueChange={setSelectedCategory}
+              >
                 <SelectTrigger className="w-full md:w-[180px]">
                   <SelectValue placeholder="Category" />
                 </SelectTrigger>
@@ -206,7 +206,8 @@ const InventoryForm = ({ onSave = () => {} }) => {
           </CardHeader>
           <CardContent>
             <div className="text-sm text-muted-foreground mb-2">
-              Showing <strong>{filteredInventory.length}</strong> ingredient{filteredInventory.length === 1 ? "" : "s"} in the system.
+              Showing <strong>{filteredInventory.length}</strong> ingredient
+              {filteredInventory.length === 1 ? "" : "s"} in the system.
             </div>
 
             <div className="rounded-md border">
@@ -226,7 +227,9 @@ const InventoryForm = ({ onSave = () => {} }) => {
                   {filteredInventory.length > 0 ? (
                     filteredInventory.map((item) => (
                       <TableRow key={item.id}>
-                        <TableCell className="font-medium">{item.name}</TableCell>
+                        <TableCell className="font-medium">
+                          {item.name}
+                        </TableCell>
                         <TableCell>{item.category}</TableCell>
                         <TableCell>
                           <Input
@@ -245,7 +248,8 @@ const InventoryForm = ({ onSave = () => {} }) => {
                           {getStatusBadge(item.currentStock, item.parLevel)}
                         </TableCell>
                         <TableCell>
-                          {Math.max(0, item.parLevel - item.currentStock)} {item.unit}
+                          {Math.max(0, item.parLevel - item.currentStock)}{" "}
+                          {item.unit}
                         </TableCell>
                       </TableRow>
                     ))
@@ -259,8 +263,13 @@ const InventoryForm = ({ onSave = () => {} }) => {
                 </TableBody>
               </Table>
             </div>
+
             <div className="flex justify-end mt-6">
-              <Button onClick={handleSave} className="flex items-center gap-2" disabled={isSaving}>
+              <Button
+                onClick={handleSave}
+                className="flex items-center gap-2"
+                disabled={isSaving}
+              >
                 <Save className="h-4 w-4" />
                 {isSaving
                   ? "Saving..."
@@ -279,5 +288,6 @@ const InventoryForm = ({ onSave = () => {} }) => {
 };
 
 export default InventoryForm;
+
 
 
