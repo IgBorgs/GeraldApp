@@ -55,7 +55,8 @@ const InventoryForm = ({ onSave = () => {} }) => {
     const fetchInventory = async () => {
       const { data: itemsData, error: itemsError } = await supabase
         .from("items")
-        .select("*");
+        .select("*")
+        .eq("is_deleted", false);
 
       if (itemsError) {
         console.error("❌ Error fetching items:", itemsError.message);

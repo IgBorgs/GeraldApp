@@ -1,85 +1,120 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
+Card,
+CardContent,
+CardHeader,
+CardTitle,
+CardDescription,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+Table,
+TableBody,
+TableCell,
+TableHead,
+TableHeader,
+TableRow,
 } from "@/components/ui/table";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
+AlertDialog,
+AlertDialogAction,
+AlertDialogCancel,
+AlertDialogContent,
+AlertDialogDescription,
+AlertDialogFooter,
+AlertDialogHeader,
+AlertDialogTitle,
+AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Search, Plus, Pencil, Trash } from "lucide-react";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
 import { usePrepList } from "@/components/PrepListContext";
 
 
 interface IngredientPAR {
-  id: string;
-  name: string;
-  category: string;
-  parLevel: number;
-  unit: string;
-  notes: string;
-  estimated_time: number;
-  menu_relevance: boolean;
-  default_recipe_qty?: string | number;
-  recipe_yield?: number;
-  isLunchItem: boolean;
-  needsFryer: boolean;
+id: string;
+name: string;
+category: string;
+parLevel: number;
+unit: string;
+notes: string;
+estimated_time: number;
+menu_relevance: boolean;
+default_recipe_qty?: string | number;
+recipe_yield?: number;
+isLunchItem: boolean;
+needsFryer: boolean;
 }
 
-const PARManagement = () => {
-  const [ingredients, setIngredients] = useState<IngredientPAR[]>([]);
-  const [ingredientToDelete, setIngredientToDelete] = useState<IngredientPAR | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editedIngredient, setEditedIngredient] = useState<Partial<IngredientPAR>>({});
-  const [showAddDialog, setShowAddDialog] = useState(false);
-  const [showEditDialog, setShowEditDialog] = useState(false);
-  const [newIngredient, setNewIngredient] = useState<Partial<IngredientPAR>>({
-    name: "",
-    category: "Protein",
-    parLevel: 0,
-    unit: "lbs",
-    notes: "",
-    estimated_time: 15,
-    menu_relevance: false,
-    default_recipe_qty: "",
-    recipe_yield: 1,
-    isLunchItem: false,
-    needsFryer: false,
-  });
 
-  const { refreshPrepList } = usePrepList();
+const PARManagement = () => {
+const [ingredients, setIngredients] = useState<IngredientPAR[]>([]);
+const [ingredientToDelete, setIngredientToDelete] = useState<IngredientPAR | null>(null);
+const [searchTerm, setSearchTerm] = useState("");
+const [editingId, setEditingId] = useState<string | null>(null);
+const [editedIngredient, setEditedIngredient] = useState<Partial<IngredientPAR>>({});
+const [showAddDialog, setShowAddDialog] = useState(false);
+const [showEditDialog, setShowEditDialog] = useState(false);
+const [showCustomInputDialog, setShowCustomInputDialog] = useState(false);
+const [customFieldType, setCustomFieldType] = useState<"category" | "unit" | null>(null);
+const [customInputValue, setCustomInputValue] = useState("");
+const [newIngredient, setNewIngredient] = useState<Partial<IngredientPAR>>({
+name: "",
+category: "Protein",
+parLevel: 0,
+unit: "lbs",
+notes: "",
+estimated_time: 15,
+menu_relevance: false,
+default_recipe_qty: "",
+recipe_yield: 1,
+isLunchItem: false,
+needsFryer: false,
+});
+
+
+const { refreshPrepList, prepList, setPrepList } = usePrepList();
+
+
+const [categories, setCategories] = useState([
+"Protein", "Dry Goods", "Sauces", "Vegetables", "Spices", "Produce", "Butter", "Dairy", "Desserts", "Others",
+]);
+
+
+const [units, setUnits] = useState([
+"lbs", "ea", "L", "bin(s)",
+]);
+  
+
+  const handleCustomValueSave = () => {
+    if (!customInputValue.trim()) return;
+    if (customFieldType === "category" && !categories.includes(customInputValue)) {
+    setCategories((prev) => [...prev, customInputValue]);
+    setNewIngredient((prev) => ({ ...prev, category: customInputValue }));
+    setEditedIngredient((prev) => ({ ...prev, category: customInputValue }));
+    } else if (customFieldType === "unit" && !units.includes(customInputValue)) {
+    setUnits((prev) => [...prev, customInputValue]);
+    setNewIngredient((prev) => ({ ...prev, unit: customInputValue }));
+    setEditedIngredient((prev) => ({ ...prev, unit: customInputValue }));
+    }
+    setCustomInputValue("");
+    setCustomFieldType(null);
+    setShowCustomInputDialog(false);
+    };
+
+
 
   const fetchIngredients = async () => {
-    const { data: items, error: itemsError } = await supabase.from("items").select("*");
+    const { data: items, error: itemsError } = await supabase.from("items").select("*").eq("is_deleted", false); // Only show items not deleted;
     if (itemsError) {
       console.error("❌ Failed to fetch ingredients:", itemsError?.message);
       return;
@@ -98,6 +133,9 @@ const PARManagement = () => {
       isLunchItem: item.is_lunch_item ?? false,
       needsFryer: item.needs_fryer ?? false,
     }));
+
+    formatted.sort((a, b) => a.name.localeCompare(b.name));
+
     setIngredients(formatted);
   };
 
@@ -167,18 +205,43 @@ const PARManagement = () => {
   };
 
   const handleDeleteIngredient = async (id: string) => {
+    // Delete stock entries associated with the item
     const { error: stockError } = await supabase.from("stock").delete().eq("item_id", id);
     if (stockError) {
       console.error("❌ Failed to delete from stock:", stockError.message);
       return;
     }
-    const { error: itemError } = await supabase.from("items").delete().eq("id", id);
+  
+    // Soft-delete the item in the items table
+    const { error: itemError } = await supabase
+      .from("items")
+      .update({ is_deleted: true })
+      .eq("id", id);
+  
     if (itemError) {
-      console.error("❌ Failed to delete from items:", itemError.message);
-    } else {
-      fetchIngredients();
+      console.error("❌ Failed to soft-delete item:", itemError.message);
+      return;
     }
+  
+    // Immediately delete incomplete prep_list entries for this item
+    const { error: prepListDeleteError } = await supabase
+      .from("prep_list")
+      .delete()
+      .eq("item_id", id)
+      .eq("completed", false);
+  
+    if (prepListDeleteError) {
+      console.error("⚠️ Failed to delete item from prep_list:", prepListDeleteError.message);
+    }
+  
+    // Remove from frontend state
+  setPrepList((prev) => prev.filter((item) => item.item_id !== id));
+
+    // Refresh the ingredients table
+    fetchIngredients();
   };
+  
+  
 
   const filteredIngredients = ingredients.filter((ingredient) =>
     ingredient.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -261,9 +324,11 @@ const PARManagement = () => {
               </AlertDialogHeader>
               <div className="grid grid-cols-4 gap-4 py-4">
                 {[{ label: "Name", field: "name", type: "text" },
-                  { label: "Category", field: "category", type: "select", options: ["Protein", "Dry Goods", "Sauces", "Vegetables", "Spices", "Produce", "Butter", "Dairy", "Desserts", "Others"] },
+                  { label: "Category", field: "category", type: "select", options: categories },
+
                   { label: "PAR Level", field: "parLevel", type: "number" },
-                  { label: "Unit", field: "unit", type: "select", options: ["lbs", "ea", "L", "bin(s)"] },
+                  { label: "Unit", field: "unit", type: "select", options: units },
+
                   { label: "Qty to Prep (Recipe)", field: "default_recipe_qty", type: "text" },
                   { label: "Recipe Yield", field: "recipe_yield", type: "number" },
                   { label: "Estimated Time", field: "estimated_time", type: "number" },
@@ -276,13 +341,35 @@ const PARManagement = () => {
                     {type === "checkbox" ? (
                       <Input type="checkbox" checked={!!editedIngredient[field]} onChange={(e) => setEditedIngredient({ ...editedIngredient, [field]: e.target.checked })} className="h-4 w-4" />
                     ) : type === "select" && options ? (
-                      <Select value={editedIngredient[field] as string} onValueChange={(value) => setEditedIngredient({ ...editedIngredient, [field]: value })}>
+                      <Select
+  value={editedIngredient[field] as string}
+  onValueChange={(value) => {
+    if (value === "__add_new__") {
+      setCustomFieldType(field === "category" ? "category" : "unit");
+      setCustomInputValue(""); // Clear input
+      setShowCustomInputDialog(true); // Open custom modal
+      return;
+    } else {
+      setEditedIngredient({ ...editedIngredient, [field]: value });
+    }
+    
+  }}
+>
+
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder={`Select ${label.toLowerCase()}`} />
                         </SelectTrigger>
                         <SelectContent>
-                          {options.map((opt) => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                        </SelectContent>
+  {options.map((opt) => (
+    <SelectItem key={opt} value={opt}>
+      {opt}
+    </SelectItem>
+  ))}
+  <SelectItem value="__add_new__" className="text-primary font-semibold">
+    ➕ Add new
+  </SelectItem>
+</SelectContent>
+
                       </Select>
                     ) : (
                       <Input type={type} value={editedIngredient[field]?.toString() || ""} onChange={(e) => setEditedIngredient({ ...editedIngredient, [field]: type === "number" ? parseFloat(e.target.value) : e.target.value })} className="w-full" />
@@ -326,9 +413,11 @@ const PARManagement = () => {
               <div className="grid grid-cols-4 gap-4 py-4">
                 {[
                   { label: "Name", field: "name", type: "text" },
-                  { label: "Category", field: "category", type: "select", options: ["Protein", "Dry Goods", "Sauces", "Vegetables", "Spices", "Produce", "Butter", "Dairy", "Desserts", "Others"] },
+                  { label: "Category", field: "category", type: "select", options: categories },
+
                   { label: "PAR Level", field: "parLevel", type: "number" },
-                  { label: "Unit", field: "unit", type: "select", options: ["lbs", "ea", "L", "bin(s)"] },
+                  { label: "Unit", field: "unit", type: "select", options: units },
+
                   { label: "Qty to Prep (Recipe)", field: "default_recipe_qty", type: "text" },
                   { label: "Recipe Yield", field: "recipe_yield", type: "number" },
                   { label: "Estimated Time", field: "estimated_time", type: "number" },
@@ -350,21 +439,34 @@ const PARManagement = () => {
                       />
                     ) : type === "select" && options ? (
                       <Select
-                        value={newIngredient[field] as string}
-                        onValueChange={(value) =>
-                          setNewIngredient({ ...newIngredient, [field]: value })
-                        }
-                      >
+  value={newIngredient[field] as string}
+  onValueChange={(value) => {
+    if (value === "__add_new__") {
+      setCustomFieldType(field === "category" ? "category" : "unit");
+      setCustomInputValue(""); // Clear input
+      setShowCustomInputDialog(true); // Open custom modal
+      return;
+    } else {
+      setEditedIngredient({ ...editedIngredient, [field]: value });
+    }
+    
+  }}
+>
+
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder={`Select ${label.toLowerCase()}`} />
                         </SelectTrigger>
                         <SelectContent>
-                          {options.map((opt) => (
-                            <SelectItem key={opt} value={opt}>
-                              {opt}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
+  {options.map((opt) => (
+    <SelectItem key={opt} value={opt}>
+      {opt}
+    </SelectItem>
+  ))}
+  <SelectItem value="__add_new__" className="text-primary font-semibold">
+    ➕ Add new
+  </SelectItem>
+</SelectContent>
+
                       </Select>
                     ) : (
                       <Input
@@ -391,6 +493,22 @@ const PARManagement = () => {
 
         </CardContent>
       </Card>
+
+      {/* Custom Value Dialog */}
+<Dialog open={showCustomInputDialog} onOpenChange={setShowCustomInputDialog}>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Add New {customFieldType === "category" ? "Category" : "Unit"}</DialogTitle>
+    </DialogHeader>
+    <Input
+      placeholder={`Enter a new ${customFieldType}`}
+      value={customInputValue}
+      onChange={(e) => setCustomInputValue(e.target.value)}
+      className="mb-4"
+    />
+    <Button onClick={handleCustomValueSave}>Save</Button>
+  </DialogContent>
+</Dialog>
     </div>
   );
 };

@@ -56,20 +56,27 @@ function formatTime(date: Date) {
   return `${hours}:${minutes}:${seconds}`;
 }
 
-
-
 const PrepListPDF: React.FC<PrepListPDFProps> = ({
   items,
   prepStartTime,
   prepEndTime,
 }) => {
-  // Unified sorting logic: A > B > C > others, then alphabetical
+  // Sort A > B > C > others, then alphabetically
   const sortedItems = [...items].sort((a, b) => {
-    const priorityOrder = { A: 0, B: 1, C: 2 };
+    const priorityOrder: Record<string, number> = { A: 0, B: 1, C: 2 };
     const aPriority = priorityOrder[a.priority] ?? 3;
     const bPriority = priorityOrder[b.priority] ?? 3;
     if (aPriority !== bPriority) return aPriority - bPriority;
     return a.name.localeCompare(b.name);
+  });
+
+  // ---- Priority breakdown ----
+  const priorities = ["A", "B", "C"];
+  const breakdown = priorities.map((p) => {
+    const itemsInPriority = sortedItems.filter((i) => i.priority === p);
+    const done = itemsInPriority.filter((i) => i.completed).length;
+    const needsPrep = itemsInPriority.length - done;
+    return { p, done, needsPrep };
   });
 
   return (
@@ -83,7 +90,8 @@ const PrepListPDF: React.FC<PrepListPDFProps> = ({
               • Prep Date: {formatDate(prepStartTime)}
             </Text>
             <Text style={{ fontSize: 12, marginBottom: 2 }}>
-              • Started at: {formatTime(prepStartTime)}  -  Ended at: {prepEndTime ? formatTime(prepEndTime) : "--:--:--"}
+              • Started at: {formatTime(prepStartTime)}  -  Ended at:{" "}
+              {prepEndTime ? formatTime(prepEndTime) : "--:--:--"}
             </Text>
             {prepEndTime && (
               <Text style={{ fontSize: 12, marginBottom: 10 }}>
@@ -93,16 +101,15 @@ const PrepListPDF: React.FC<PrepListPDFProps> = ({
           </>
         )}
 
-
-
         <View style={styles.tableHeader}>
           <Text style={styles.cell}>Item</Text>
           <Text style={styles.cell}>Qty</Text>
           <Text style={styles.cell}>Unit</Text>
           <Text style={styles.cell}>Priority</Text>
           <Text style={styles.cell}>Time</Text>
-          <Text style={styles.cell}>Done</Text>
+          <Text style={styles.cell}>Status</Text>
         </View>
+
         {sortedItems.map((item, i) => (
           <View key={i} style={styles.tableRow}>
             <Text style={styles.cell}>{item.name}</Text>
@@ -110,20 +117,25 @@ const PrepListPDF: React.FC<PrepListPDFProps> = ({
             <Text style={styles.cell}>{item.unit}</Text>
             <Text style={styles.cell}>{item.priority}</Text>
             <Text style={styles.cell}>{item.estimatedTime || "—"}</Text>
-            <Text style={styles.cell}>{item.completed ? "✓" : "✗"}</Text>
+            <Text style={styles.cell}>
+              {item.completed ? "Done" : "Needs prep"}
+            </Text>
           </View>
         ))}
+
+        {/* ---- Footer summary ---- */}
         <Text style={styles.summary}>Total items: {sortedItems.length}</Text>
         <Text style={styles.summary}>
           Completed: {sortedItems.filter((i) => i.completed).length}
         </Text>
+        {breakdown.map((b) => (
+          <Text key={b.p} style={styles.summary}>
+            Priority {b.p} — Done: {b.done} / Needs prep: {b.needsPrep}
+          </Text>
+        ))}
         <Text style={styles.summary}>
           Estimated Time:{" "}
-          {sortedItems.reduce(
-            (acc, i) => acc + (i.estimatedTime || 0),
-            0
-          )}{" "}
-          mins
+          {sortedItems.reduce((acc, i) => acc + (i.estimatedTime || 0), 0)} mins
         </Text>
       </Page>
     </Document>
@@ -131,4 +143,5 @@ const PrepListPDF: React.FC<PrepListPDFProps> = ({
 };
 
 export default PrepListPDF;
+
 

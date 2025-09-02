@@ -56,7 +56,7 @@ const PrepListDisplay = () => {
   });
 
   const sortedItems = [...filteredItems].sort((a, b) => {
-    if (sortBy === "priority") return a.priority.localeCompare(b.priority);
+    if (sortBy === "priority") return String(a.priority).localeCompare(String(b.priority));
     if (sortBy === "name") return a.name.localeCompare(b.name);
     if (sortBy === "time") return a.estimated_time - b.estimated_time;
     return 0;
@@ -191,18 +191,26 @@ const PrepListDisplay = () => {
           </Card>
         </div>
 
+        
         <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid grid-cols-4 mb-6">
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="A">Priority A</TabsTrigger>
-            <TabsTrigger value="B">Priority B</TabsTrigger>
-            <TabsTrigger value="C">Priority C</TabsTrigger>
-          </TabsList>
+  {/* Full-width, even tabs across the row */}
+  <TabsList className="grid w-full grid-cols-4 mb-6">
+    <TabsTrigger className="w-full" value="all">All</TabsTrigger>
+    <TabsTrigger className="w-full" value="A">Priority A</TabsTrigger>
+    <TabsTrigger className="w-full" value="B">Priority B</TabsTrigger>
+    <TabsTrigger className="w-full" value="C">Priority C</TabsTrigger>
+  </TabsList>
           <TabsContent value={activeTab}>
             <Card>
-              <CardHeader className="pb-2 flex justify-between">
-                <CardTitle className="text-lg">Prep Items</CardTitle>
+              <CardHeader className="pb-2">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between w-full">
+                  <CardTitle className="text-lg">Prep Items</CardTitle>
+                  <div className="text-sm text-muted-foreground mt-1 sm:mt-0">
+                    {sortedItems.length} item{sortedItems.length !== 1 ? "s" : ""} found
+                  </div>
+                </div>
               </CardHeader>
+
               <CardContent>
                 {sortedItems.length > 0 ? (
                   <div className="space-y-4">
@@ -225,9 +233,7 @@ const PrepListDisplay = () => {
                             <label
                               htmlFor={`item-${item.id}`}
                               className={`font-medium ${
-                                item.completed
-                                  ? "line-through text-gray-500"
-                                  : "text-gray-900"
+                                item.completed ? "line-through text-gray-500" : "text-gray-900"
                               }`}
                             >
                               {item.name}
@@ -238,7 +244,7 @@ const PrepListDisplay = () => {
                             </div>
                           </div>
                         </div>
-                        <Badge className={getPriorityColor(item.priority as "A" | "B" | "C")}>
+                        <Badge className={getPriorityColor(item.priority as "A" | "B" | "C" )}>
                           Priority {item.priority}
                         </Badge>
                       </div>
@@ -256,10 +262,10 @@ const PrepListDisplay = () => {
       </div>
     </div>
   );
-
 };
 
 export default PrepListDisplay;
+
 
 
 
