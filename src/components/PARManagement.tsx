@@ -377,6 +377,22 @@ const [units, setUnits] = useState([
                   </div>
                 ))}
               </div>
+
+              {/* Short inline explanation */}
+<p className="text-xs text-muted-foreground italic px-1 -mt-2 mb-2">
+* Qty to Prep × Recipe Yield = Total portions produced
+</p>
+
+
+{/* Full legend */}
+<p className="text-sm text-muted-foreground mt-2 px-1">
+<strong>How to fill this form:</strong><br />
+- <strong>PAR Level</strong>: The minimum amount of this item you want available at all times.<br />
+- <strong>Qty to Prep (Recipe)</strong>: How many times you'll prepare this recipe.<br />
+- <strong>Recipe Yield</strong>: How many units (portions, items, etc.) one recipe produces.<br /><br />
+<em>Example:</em> If you prep <strong>2 recipes</strong> of "5oz Marinated", and each recipe yields <strong>14 portions</strong>, you’ll produce <strong>28 total portions</strong>. This helps restock your inventory above the PAR level.
+</p>
+
               <AlertDialogFooter>
                 <AlertDialogCancel onClick={() => setShowEditDialog(false)}>Cancel</AlertDialogCancel>
                 <AlertDialogAction onClick={handleEditIngredient}>Save</AlertDialogAction>
@@ -484,6 +500,22 @@ const [units, setUnits] = useState([
                   </div>
                 ))}
               </div>
+
+              {/* Short inline explanation */}
+<p className="text-xs text-muted-foreground italic px-1 -mt-2 mb-2">
+* Qty to Prep × Recipe Yield = Total portions produced
+</p>
+
+
+{/* Full legend */}
+<p className="text-sm text-muted-foreground mt-2 px-1">
+<strong>How to fill this form:</strong><br />
+- <strong>PAR Level</strong>: The minimum amount of this item you want available at all times.<br />
+- <strong>Qty to Prep (Recipe)</strong>: How many times you'll prepare this recipe.<br />
+- <strong>Recipe Yield</strong>: How many units (portions, items, etc.) one recipe produces.<br /><br />
+<em>Example:</em> If you prep <strong>2 recipes</strong> of "5oz Marinated", and each recipe yields <strong>14 portions</strong>, you’ll produce <strong>28 total portions</strong>. This helps restock your inventory above the PAR level.
+</p>
+
               <AlertDialogFooter>
                 <AlertDialogCancel onClick={() => setShowAddDialog(false)}>Cancel</AlertDialogCancel>
                 <AlertDialogAction onClick={handleAddIngredient}>Add</AlertDialogAction>

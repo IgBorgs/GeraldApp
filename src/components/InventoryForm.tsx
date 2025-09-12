@@ -43,6 +43,8 @@ const InventoryForm = ({ onSave = () => {} }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [inputValues, setInputValues] = useState<{ [key: string]: string }>({});
+
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState(false);
@@ -96,13 +98,25 @@ const InventoryForm = ({ onSave = () => {} }) => {
   ];
 
   const handleStockChange = (id: string, value: string) => {
-    const numValue = value === "" ? 0 : Number(value);
-    setInventory(
-      inventory.map((item) =>
-        item.id === id ? { ...item, currentStock: numValue } : item
-      )
-    );
+    const normalized = value.replace(",", ".");
+  
+    setInputValues((prev) => ({
+      ...prev,
+      [id]: value,
+    }));
+  
+    const parsed = parseFloat(normalized);
+    if (!isNaN(parsed)) {
+      setInventory(
+        inventory.map((item) =>
+          item.id === id ? { ...item, currentStock: parsed } : item
+        )
+      );
+    }
   };
+  
+
+  
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -233,15 +247,14 @@ const InventoryForm = ({ onSave = () => {} }) => {
                         </TableCell>
                         <TableCell>{item.category}</TableCell>
                         <TableCell>
-                          <Input
-                            type="number"
-                            value={item.currentStock}
-                            onChange={(e) =>
-                              handleStockChange(item.id, e.target.value)
-                            }
-                            className="w-20"
-                            min="0"
-                          />
+                        <Input
+  type="text"
+  value={inputValues[item.id] ?? item.currentStock.toString()}
+  onChange={(e) => handleStockChange(item.id, e.target.value)}
+  className="w-20"
+/>
+
+
                         </TableCell>
                         <TableCell>{item.parLevel}</TableCell>
                         <TableCell>{item.unit}</TableCell>
@@ -249,9 +262,12 @@ const InventoryForm = ({ onSave = () => {} }) => {
                           {getStatusBadge(item.currentStock, item.parLevel)}
                         </TableCell>
                         <TableCell>
-                          {Math.max(0, item.parLevel - item.currentStock)}{" "}
-                          {item.unit}
+                          {(() => {
+                            const needed = Math.max(0, item.parLevel - item.currentStock);
+                            return `${Number.isInteger(needed) ? needed : needed.toFixed(2)} ${item.unit}`;
+                          })()}
                         </TableCell>
+
                       </TableRow>
                     ))
                   ) : (
