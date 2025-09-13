@@ -163,16 +163,6 @@ export const PrepListProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         if (autoPriority === null) return null;
 
-// Exclude items where stock is far above PAR (e.g. > 1.2 * par)
-if (autoPriority === "D") {
-  const stockQty = Number(stockMap.get(item.id)) || 0;
-  const parLevel = Number(item.par_level) || 0;
-  const overstockLimit = parLevel * 1.2;
-
-  if (stockQty > overstockLimit) {
-    return null;
-  }
-}
 
         const defaultBatch = Number(item.default_recipe_qty || 0);
 
