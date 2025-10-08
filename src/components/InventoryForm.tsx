@@ -30,6 +30,10 @@ import { usePrepList } from "@/components/PrepListContext";
 import BackToHomeButton from "./BackToHomeButton";
 import { useLocation } from "react-router-dom";
 
+const getRestaurantId = () => localStorage.getItem("restaurant_id");
+
+
+
 interface InventoryItem {
   id: string;
   name: string;
@@ -39,7 +43,10 @@ interface InventoryItem {
   unit: string;
 }
 
+
+
 const InventoryForm = ({ onSave = () => {} }) => {
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -58,7 +65,8 @@ const InventoryForm = ({ onSave = () => {} }) => {
       const { data: itemsData, error: itemsError } = await supabase
         .from("items")
         .select("*")
-        .eq("is_deleted", false);
+        .eq("is_deleted", false)
+        .eq("restaurant_id", getRestaurantId());
 
       if (itemsError) {
         console.error("❌ Error fetching items:", itemsError.message);
@@ -67,7 +75,8 @@ const InventoryForm = ({ onSave = () => {} }) => {
 
       const { data: stockData, error: stockError } = await supabase
         .from("stock")
-        .select("*");
+        .select("*")
+        .eq("restaurant_id", getRestaurantId());
 
       if (stockError) {
         console.error("❌ Error fetching stock:", stockError.message);
@@ -126,6 +135,7 @@ const InventoryForm = ({ onSave = () => {} }) => {
     const formattedStock = inventory.map((item) => ({
       item_id: item.id,
       quantity: item.currentStock,
+      restaurant_id: getRestaurantId(),
     }));
 
     const { data, error } = await supabase

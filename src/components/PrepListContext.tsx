@@ -1,6 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { getAutoPriority } from "@/lib/priority";
+import { useRestaurantId } from "@/lib/useRestaurantId";
+
+const getRestaurantId = () => localStorage.getItem("restaurant_id");
+
+
 
 export interface PrepItem {
   id?: string;
@@ -57,6 +62,9 @@ export const PrepListProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [prepStartTime, setPrepStartTime] = useState<Date | null>(null);
   const [prepEndTime, setPrepEndTime] = useState<Date | null>(null);
 
+
+
+
   const markItemCompleted = (id: string, completed: boolean) => {
     setPrepList((prev) =>
       prev.map((item) => (item.id === id ? { ...item, completed } : item))
@@ -87,6 +95,11 @@ export const PrepListProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const fetchGeneratedPrepList = async (forceRefresh = false) => {
+    if (!getRestaurantId()) {
+      console.warn("🔒 No restaurantId yet — skipping prep list fetch.");
+      return;
+    }
+    
     setIsLoading(true);
     setError(null);
 
@@ -96,7 +109,8 @@ export const PrepListProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const { data: existingPrepList, error: existingError } = await supabase
       .from("prep_list")
       .select("*")
-      .eq("date", today);
+      .eq("date", today)
+      .eq("restaurant_id", getRestaurantId());
 
     if (existingError) {
       console.error("❌ Error checking prep_list:", existingError.message);
@@ -109,7 +123,9 @@ export const PrepListProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const { data: activeItems, error: itemsError } = await supabase
       .from("items")
       .select("*")
-      .eq("is_deleted", false);
+      .eq("is_deleted", false)
+      .eq("restaurant_id", getRestaurantId());
+
 
     if (itemsError) {
       console.error("❌ Error fetching active items:", itemsError.message);
@@ -133,7 +149,7 @@ export const PrepListProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
 
     // 4) Load stock
-    const { data: stockData, error: stockError } = await supabase.from("stock").select("*");
+    const { data: stockData, error: stockError } = await supabase.from("stock").select("*").eq("restaurant_id", getRestaurantId());
     if (stockError) {
       console.error("❌ Error fetching stock:", stockError.message);
       setError(stockError.message);
@@ -163,10 +179,20 @@ export const PrepListProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         if (autoPriority === null) return null;
 
+// Exclude items where stock is far above PAR (e.g. > 1.2 * par)
+if (autoPriority === "C") {
+  const stockQty = Number(stockMap.get(item.id)) || 0;
+  const parLevel = Number(item.par_level) || 0;
+  const overstockLimit = parLevel * 1.2;
+
+  if (stockQty > overstockLimit) {
+    return null;
+  }
+}
 
         const defaultBatch = Number(item.default_recipe_qty || 0);
 
-        const row: Omit<PrepItem, "id"> = {
+        const row: Omit<PrepItem, "id"> & { restaurant_id: string } = {
           item_id: item.id,
           name: item.name,
           category: item.category,
@@ -179,6 +205,7 @@ export const PrepListProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           recipe_yield: Number(item.recipe_yield) || 1,
           completed: false,
           date: today,
+          restaurant_id: getRestaurantId(),
           
         };
         
@@ -202,7 +229,8 @@ export const PrepListProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const { data: freshList, error: freshErr } = await supabase
       .from("prep_list")
       .select("*")
-      .eq("date", today);
+      .eq("date", today)
+      .eq("restaurant_id", getRestaurantId());
 
     if (freshErr) {
       console.error("❌ Error fetching fresh prep_list:", freshErr.message);
@@ -220,8 +248,11 @@ export const PrepListProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   useEffect(() => {
-    fetchGeneratedPrepList();
-  }, []);
+    if (getRestaurantId()) {
+      fetchGeneratedPrepList();
+    }
+  }, [getRestaurantId()]);
+  
 
   return (
     <PrepListContext.Provider

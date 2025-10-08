@@ -51,6 +51,15 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+
+        gerald: {
+          header: "#e2e8f0", // soft blue-gray (from your View Prep List card)
+          orange: "#f97316", // optional: keep your old orange (Tailwind orange-500)
+          brown: "#8B5E3C",
+          brownDark: "#6E462B",
+        },
+
+
       },
       borderRadius: {
         lg: "var(--radius)",

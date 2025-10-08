@@ -152,6 +152,9 @@ const PrepListDisplay = () => {
                       Estimated Total Time: {report.totalTime} min (
                       {Math.floor(report.totalTime / 60)}h {report.totalTime % 60}min)
                     </div>
+                    <p className="text-sm text-gray-500 mt-1 italic">
+  * Actual prep time may vary, since some tasks can be done simultaneously.
+</p>
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-2">
