@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import Home from "./components/home";
+import Home from "./components/HomeComponent";
 import PARManagement from "./components/PARManagement";
 import PrepListDisplay from "./components/PrepListDisplay";
 import InventoryForm from "./components/InventoryForm";
