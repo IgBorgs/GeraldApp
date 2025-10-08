@@ -39,6 +39,9 @@ SelectValue,
 } from "@/components/ui/select";
 import { usePrepList } from "@/components/PrepListContext";
 
+const getRestaurantId = () => localStorage.getItem("restaurant_id");
+
+
 
 interface IngredientPAR {
 id: string;
@@ -54,6 +57,9 @@ recipe_yield?: number;
 isLunchItem: boolean;
 needsFryer: boolean;
 }
+
+
+
 
 
 const PARManagement = () => {
@@ -80,6 +86,8 @@ recipe_yield: 1,
 isLunchItem: false,
 needsFryer: false,
 });
+
+
 
 
 const { refreshPrepList, prepList, setPrepList } = usePrepList();
@@ -114,7 +122,12 @@ const [units, setUnits] = useState([
 
 
   const fetchIngredients = async () => {
-    const { data: items, error: itemsError } = await supabase.from("items").select("*").eq("is_deleted", false); // Only show items not deleted;
+    const { data: items, error: itemsError } = await supabase
+  .from("items")
+  .select("*")
+  .eq("is_deleted", false)
+  .eq("restaurant_id", getRestaurantId());
+ // Only show items not deleted;
     if (itemsError) {
       console.error("❌ Failed to fetch ingredients:", itemsError?.message);
       return;
@@ -156,6 +169,7 @@ const [units, setUnits] = useState([
       recipe_yield: newIngredient.recipe_yield,
       is_lunch_item: newIngredient.isLunchItem,
       needs_fryer: newIngredient.needsFryer,
+      restaurant_id: getRestaurantId(),
     }]);
     if (!error) {
       setShowAddDialog(false);
